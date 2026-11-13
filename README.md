@@ -12,6 +12,7 @@
 - [Суть инцидента, факты, решения и ограничения](docs/windows-execution/incident-2026-11-13.md).
 - [Исходники, сборка, проверки и восстановление](windows-execution/README.md).
 - [Контрольные суммы принятого снимка](windows-execution/snapshot.json).
+- [Критический разбор issues и принятый объём исправлений](docs/windows-execution/issue-review-2026-11-13.md).
 
 В снимке: общий исполнитель команд на Windows Job Objects, нативные hooks
 Codex/Antigravity, PerfMon и обслуживание хранения. Обычная диагностика хранится
