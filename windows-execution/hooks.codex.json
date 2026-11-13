@@ -5,8 +5,8 @@
       "matcher": "^Bash$",
       "hooks": [{
         "type": "command",
-        "command": "C:/Users/Администратор/.agents/windows-execution/agent-exec.v1.exe hook codex",
-        "commandWindows": "C:/Users/Администратор/.agents/windows-execution/agent-exec.v1.exe hook codex",
+        "command": "C:/Users/Администратор/.agents/windows-execution/agent-exec.v3.exe hook codex",
+        "commandWindows": "C:/Users/Администратор/.agents/windows-execution/agent-exec.v3.exe hook codex",
         "timeout": 3,
         "async": false
       }]

@@ -30,7 +30,7 @@ internal static class WinJobSmoke
             }
             string folder = args.Length > 1 && args[0] == "suite" ? args[1] : Path.Combine(Path.GetDirectoryName(Self), "winjob-smoke-" + DateTime.UtcNow.ToString("yyyyMMddTHHmmss") + "-" + Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(folder);
-            string[] cases = args.Length > 0 && args[0] != "suite" ? args : new string[] { "normal", "timeout", "cancel", "output", "stdin", "process", "memory", "named", "collision", "ownerdeath", "parentdeath", "startuplimit" };
+            string[] cases = args.Length > 0 && args[0] != "suite" ? args : new string[] { "normal", "timeout", "cancel", "output", "tail", "mixed", "nooutput", "zero", "tiny", "stdin", "process", "memory", "named", "collision", "ownerdeath", "parentdeath", "startuplimit", "cancelerror", "blockedoutput", "notice", "notice-open" };
             if (args.Length > 2 && args[0] == "suite") cases = new string[] { args[2] };
             foreach (string test in cases)
             {
@@ -59,20 +59,57 @@ internal static class WinJobSmoke
     {
         string test = args[1], mode = "spawnsleep";
         if (test == "normal") mode = "spawnexit";
-        if (test == "output") mode = "output";
+        if (test == "output" || test == "zero" || test == "tiny" || test == "blockedoutput") mode = "output";
+        if (test == "tail" || test == "mixed") mode = test;
+        if (test == "nooutput") mode = "simple";
         if (test == "stdin") mode = "stdin";
         if (test == "process") mode = "denied";
         if (test == "memory") mode = "memory";
         if (test == "startuplimit") mode = "simple";
+        if (test == "notice" || test == "notice-open")
+        {
+            uint flags, outputSize, inputSize, instances;
+            int noticeBytes = 64;
+            uint capacity = 0;
+            if (test == "notice")
+            {
+                Check(GetNamedPipeInfo(GetStdHandle(-12), out flags, out outputSize, out inputSize, out instances), "notice fixture pipe capacity unavailable");
+                capacity = Math.Max(outputSize, inputSize);
+                Check(capacity <= 65536, "notice fixture pipe is unexpectedly large");
+                noticeBytes = Math.Max(4096, (int)capacity) + 1024;
+            }
+            Stopwatch noticeTime = Stopwatch.StartNew();
+            bool first = WinJob.WriteNotice(test == "notice" ? new String('N', noticeBytes) : "NOTICE_ONE\n", noticeBytes);
+            bool second = test == "notice" || WinJob.WriteNotice("NOTICE_TWO\n", 64);
+            File.WriteAllText(args[3], "notice|" + noticeTime.ElapsedMilliseconds + "|" + first + "|" + second + "|" + noticeBytes + "|" + capacity, Encoding.UTF8);
+            return 0;
+        }
+
         RunSpec spec = Spec(mode, args[2], args[4]);
         spec.WatchParent = args[5] == "true";
         if (test == "timeout") spec.TimeoutMilliseconds = 700;
         if (test == "process") spec.MaxProcesses = 1;
         if (test == "memory") spec.MemoryBytes = 24L * 1024 * 1024;
         if (test == "startuplimit") spec.MemoryBytes = 4096;
+        if (test == "tail" || test == "mixed") spec.MaxOutputBytes = 512;
+        if (test == "zero") spec.MaxOutputBytes = 0;
+        if (test == "tiny") spec.MaxOutputBytes = 1;
+        if (test == "blockedoutput") spec.MaxOutputBytes = 16384;
         Stopwatch timer = Stopwatch.StartNew();
-        if (test == "cancel") spec.IsCancelled = delegate() { return timer.ElapsedMilliseconds >= 700; };
+        int cancellationChecks = 0;
+        long previousCheck = -1, minimumGap = Int64.MaxValue;
+        if (test == "cancel") spec.IsCancelled = delegate() {
+            long now = timer.ElapsedMilliseconds;
+            cancellationChecks++;
+            if (previousCheck >= 0) minimumGap = Math.Min(minimumGap, now - previousCheck);
+            previousCheck = now;
+            return now >= 700;
+        };
+        if (test == "cancelerror") spec.IsCancelled = delegate() { throw new InvalidOperationException("expected cancellation query failure"); };
         RunResult result = WinJob.Run(spec);
+        if (test == "cancel") File.WriteAllText(args[3] + ".cancel",
+            cancellationChecks + "|" + minimumGap + "|" + timer.ElapsedMilliseconds, Encoding.UTF8);
+
         File.WriteAllText(args[3], String.Join("|", new string[] {
             result.Reason, result.ExitCode.ToString(), result.CleanupConfirmed.ToString(), result.OutputClipped.ToString(),
             result.StdoutBytes.ToString(), result.StderrBytes.ToString(), result.PeakJobMemoryBytes.ToString(),
@@ -89,9 +126,22 @@ internal static class WinJobSmoke
             byte[] bytes = new byte[8192];
             for (int i = 0; i < bytes.Length; i++) bytes[i] = (byte)'A';
             Console.OpenStandardOutput().Write(bytes, 0, bytes.Length);
+            for (int i = 0; i < bytes.Length; i++) bytes[i] = (byte)'B';
             Console.OpenStandardError().Write(bytes, 0, bytes.Length);
             return 0;
         }
+        if (mode == "tail" || mode == "mixed")
+        {
+            byte[] output = Encoding.ASCII.GetBytes("OUT_HEAD\n" + new String('A', mode == "tail" ? 8192 : 4096) + "\nOUT_TAIL\n");
+            Console.OpenStandardOutput().Write(output, 0, output.Length);
+            if (mode == "mixed")
+            {
+                byte[] error = Encoding.ASCII.GetBytes("ERR_HEAD\n" + new String('B', 4096) + "\nERR_TAIL\n");
+                Console.OpenStandardError().Write(error, 0, error.Length);
+            }
+            return 0;
+        }
+
         if (mode == "stdin")
         {
             byte[] bytes = new byte[128]; int count = 0, read;
@@ -146,14 +196,29 @@ internal static class WinJobSmoke
     private sealed class Drain
     {
         private Thread thread;
+        private readonly MemoryStream retained = new MemoryStream(32768);
         public long Bytes;
         public Drain(Stream stream)
         {
-            thread = new Thread(delegate() { try { byte[] b = new byte[4096]; int n; while ((n = stream.Read(b, 0, b.Length)) > 0) Interlocked.Add(ref Bytes, n); } catch (IOException) { } });
+            thread = new Thread(delegate() {
+                try
+                {
+                    byte[] b = new byte[4096]; int n;
+                    while ((n = stream.Read(b, 0, b.Length)) > 0)
+                    {
+                        Interlocked.Add(ref Bytes, n);
+                        int keep = Math.Min(n, 32768 - (int)retained.Length);
+                        if (keep > 0) retained.Write(b, 0, keep);
+                    }
+                }
+                catch (IOException) { }
+            });
             thread.IsBackground = true; thread.Start();
         }
         public void Finish() { if (!thread.Join(1000)) throw new Exception("smoke output reader did not stop"); }
+        public string Text { get { return Encoding.UTF8.GetString(retained.ToArray()); } }
     }
+
 
     private static void Test(string test, string folder)
     {
@@ -161,9 +226,59 @@ internal static class WinJobSmoke
         string name = "Global\\AgentExec-smoke-" + Guid.NewGuid().ToString("N");
         File.WriteAllText(Path.Combine(folder, test + ".job"), name);
         Process owner = null, intermediary = null;
+        Drain output = null, error = null;
         List<IntPtr> participants = new List<IntPtr>();
         try
         {
+            if (test == "blockedoutput")
+            {
+                owner = StartOwner(test, file, receipt, name, false);
+                Check(owner.WaitForExit(6500), "blocked final output prevented owner completion");
+                output = new Drain(owner.StandardOutput.BaseStream);
+                error = new Drain(owner.StandardError.BaseStream);
+                output.Finish(); error.Finish();
+                WaitFile(receipt, 1000);
+                string[] blocked = File.ReadAllText(receipt, Encoding.UTF8).Split('|');
+                Check(owner.ExitCode == 0 && blocked.Length == 9 && blocked[0] == "exited" &&
+                    blocked[1] == "0" && blocked[2] == "True" && blocked[3] == "True" && blocked[7] == "0",
+                    "blocked final output did not stop and reap workers: " + String.Join("|", blocked));
+                Check(output.Bytes + error.Bytes <= 16384 && WinJob.GetActiveProcesses(name) == null,
+                    "blocked output exceeded cap or retained its job");
+                Console.Error.WriteLine("BLOCKED_OUTPUT|" + String.Join("|", blocked) + "|emitted=" + (output.Bytes + error.Bytes));
+                return;
+            }
+            if (test == "notice" || test == "notice-open")
+            {
+                owner = StartOwner(test, file, receipt, name, false);
+                if (test == "notice")
+                {
+                    // Deliberately leave stderr undrained until the helper has
+                    // returned; the write is larger than the native pipe capacity.
+                    Check(owner.WaitForExit(1500), "notice blocked owner completion");
+                    output = new Drain(owner.StandardOutput.BaseStream);
+                    error = new Drain(owner.StandardError.BaseStream);
+                }
+                else
+                {
+                    output = new Drain(owner.StandardOutput.BaseStream);
+                    error = new Drain(owner.StandardError.BaseStream);
+                    Check(owner.WaitForExit(1500), "short notices did not finish");
+                }
+                output.Finish(); error.Finish();
+                WaitFile(receipt, 1000);
+                string[] notice = File.ReadAllText(receipt, Encoding.UTF8).Split('|');
+                Check(owner.ExitCode == 0 && notice.Length == 6 && notice[0] == "notice", "notice fixture failed");
+                Check(Int64.Parse(notice[1]) < 500, "notice exceeded bounded attempt: " + notice[1]);
+                if (test == "notice")
+                {
+                    Check(notice[2] == "False", "undrained pipe did not exercise a blocked notice");
+                    Check(error.Bytes <= Int32.Parse(notice[4]) && output.Bytes == 0, "notice output exceeded its allowance");
+                }
+                else Check(notice[2] == "True" && notice[3] == "True" && error.Text == "NOTICE_ONE\nNOTICE_TWO\n", "notice closed or changed stderr");
+                Console.Error.WriteLine("NOTICE|" + test + "|" + String.Join("|", notice) + "|emitted=" + error.Bytes);
+                return;
+            }
+
             if (test == "parentdeath")
             {
                 intermediary = Process.Start(new ProcessStartInfo(Self, "ephemeral-parent " + Quote(file) + " " + Quote(receipt) + " " + Quote(name)) {
@@ -177,7 +292,7 @@ internal static class WinJobSmoke
             else
             {
                 owner = StartOwner(test == "ownerdeath" || test == "named" || test == "collision" ? "long" : test, file, receipt, name, false);
-                Drain output = new Drain(owner.StandardOutput.BaseStream), error = new Drain(owner.StandardError.BaseStream);
+                output = new Drain(owner.StandardOutput.BaseStream); error = new Drain(owner.StandardError.BaseStream);
                 if (test == "stdin") { owner.StandardInput.Write("forwarded-input"); owner.StandardInput.Close(); }
                 if (test == "ownerdeath" || test == "named" || test == "collision")
                 {
@@ -201,7 +316,7 @@ internal static class WinJobSmoke
                 }
                 Check(owner.WaitForExit(7000), "owner exceeded bounded smoke wait");
                 output.Finish(); error.Finish();
-                if (test == "output") Check(output.Bytes + error.Bytes == 1024, "physical combined output cap wrong: " + (output.Bytes + error.Bytes));
+
                 if (test != "ownerdeath") WaitFile(receipt, 1000);
             }
             if (participants.Count == 0 && File.Exists(file)) CaptureParticipants(file, participants);
@@ -217,7 +332,14 @@ internal static class WinJobSmoke
             Check(r.Length == 9 && r[2] == "True" && r[7] == "0", "cleanup receipt failed: " + String.Join("|", r));
             if (test == "normal") Check(r[0] == "exited" && r[1] == "7", "normal root exit not preserved");
             if (test == "timeout") Check(r[0] == "timeout" && r[1] == "124", "timeout receipt wrong");
-            if (test == "cancel") Check(r[0] == "cancelled" && r[1] == "130", "cancel receipt wrong");
+            if (test == "cancel")
+            {
+                Check(r[0] == "cancelled" && r[1] == "130", "cancel receipt wrong");
+                string[] timing = File.ReadAllText(receipt + ".cancel", Encoding.UTF8).Split('|');
+                Check(Int32.Parse(timing[0]) >= 2 && Int32.Parse(timing[0]) <= 4 && Int64.Parse(timing[1]) >= 400 && Int64.Parse(timing[2]) < 2000, "cancellation lookup cadence or response changed: " + String.Join("|", timing));
+                Console.Error.WriteLine("CANCEL|" + String.Join("|", timing));
+            }
+            if (test == "cancelerror") Check(r[0] == "cancellation_check_failed" && r[1] == "125", "cancellation errors were hidden");
             if (test == "parentdeath") Check(r[0] == "parent_exit", "original parent death not detected: " + r[0]);
             if (test == "stdin") Check(r[0] == "exited" && r[1] == "9", "stdin did not forward and close");
             if (test == "output") Check(r[0] == "exited" && r[1] == "0" && r[3] == "True" && Int64.Parse(r[4]) + Int64.Parse(r[5]) == 16384, "output accounting wrong");
@@ -233,6 +355,7 @@ internal static class WinJobSmoke
                 Console.Error.WriteLine("MEMORY|" + native + "|reportedPeak=" + r[6]);
             }
             if (test == "startuplimit") Check(r[0] == "job_memory_limit" && !File.Exists(file) && r[8] != "0", "startup limit did not stop the process before user code");
+            CheckOutput(test, output, error, r);
             Console.Error.WriteLine("RECEIPT|" + test + "|" + String.Join("|", r));
         }
         finally
@@ -255,6 +378,48 @@ internal static class WinJobSmoke
             }
         }
     }
+
+    private static void CheckOutput(string test, Drain output, Drain error, string[] receipt)
+    {
+        if (test != "output" && test != "tail" && test != "mixed" && test != "zero" && test != "tiny" && test != "nooutput") return;
+        long emitted = output.Bytes + error.Bytes;
+        if (test == "nooutput")
+        {
+            Check(emitted == 0 && receipt[3] == "False" && receipt[4] == "0" && receipt[5] == "0", "no-output behavior changed");
+            return;
+        }
+        int cap = test == "output" ? 1024 : test == "zero" ? 0 : test == "tiny" ? 1 : 512;
+        Check(emitted == cap && receipt[3] == "True", "combined output allowance wrong: " + emitted + "/" + cap);
+        if (test == "zero") return;
+        if (test == "tiny")
+        {
+            Check(output.Bytes == 0 && error.Text == "!", "tiny allowance did not retain a clipping indicator");
+            return;
+        }
+        System.Text.RegularExpressions.Match marker = System.Text.RegularExpressions.Regex.Match(error.Text,
+            @"\n\[agent-exec: output clipped; omitted by limit=([0-9]+) bytes; observed=([0-9]+) bytes\]\n");
+        Check(marker.Success, "visible clipping/count notice absent");
+        long observed = Int64.Parse(receipt[4]) + Int64.Parse(receipt[5]);
+        long kept = emitted - Encoding.ASCII.GetByteCount(marker.Value);
+        Check(Int64.Parse(marker.Groups[1].Value) == observed - kept && Int64.Parse(marker.Groups[2].Value) == observed, "clipping byte counts differ from emitted data");
+        if (test == "output")
+        {
+            Check(receipt[4] == "8192" && receipt[5] == "8192", "raw stream counts changed");
+            Check(output.Text.Trim('A').Length == 0 && error.Text.Replace(marker.Value, "").Trim('B').Length == 0, "child bytes crossed stdout/stderr");
+        }
+        if (test == "tail")
+        {
+            Check(receipt[4] == "8211" && receipt[5] == "0", "long stdout accounting changed");
+            Check(output.Text.StartsWith("OUT_HEAD\n") && output.Text.EndsWith("\nOUT_TAIL\n") && error.Text == marker.Value, "head or final stdout evidence lost");
+        }
+        if (test == "mixed")
+        {
+            Check(receipt[4] == "4115" && receipt[5] == "4115", "mixed stream accounting changed");
+            Check(output.Text.EndsWith("\nOUT_TAIL\n") && error.Text.EndsWith("\nERR_TAIL\n"), "both stream tails were not retained");
+            Check(!output.Text.Contains("ERR_TAIL") && !error.Text.Contains("OUT_TAIL"), "retained tails changed streams");
+        }
+    }
+
 
     private static void CaptureParticipants(string file, List<IntPtr> handles)
     {
@@ -294,6 +459,8 @@ internal static class WinJobSmoke
         Check(File.Exists(file), "smoke receipt missing");
     }
     private static void Check(bool value, string message) { if (!value) throw new Exception(message); }
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr GetStdHandle(int kind);
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern bool GetNamedPipeInfo(IntPtr pipe, out uint flags, out uint outputSize, out uint inputSize, out uint instances);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr OpenProcess(uint access, bool inherit, uint id);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern bool TerminateProcess(IntPtr process, uint exitCode);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern uint WaitForSingleObject(IntPtr handle, uint milliseconds);

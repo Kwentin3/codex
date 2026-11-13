@@ -12,10 +12,11 @@ $ErrorActionPreference = 'Stop'
 $script:TelemetryScriptPath = $MyInvocation.MyCommand.Path
 if (-not $PolicyPath) { $PolicyPath = Join-Path (Split-Path -Parent $script:TelemetryScriptPath) 'policy.json' }
 $script:TelemetryOwner = 'AgentExecution telemetry schema1'
+$script:TelemetryRuntimeOwner = $null
 $script:TelemetryCounters = @(
     '\Memory\Committed Bytes', '\Memory\Commit Limit', '\Memory\Available MBytes',
     '\Memory\Pool Paged Bytes', '\Memory\Pool Nonpaged Bytes',
-    '\Process(*)\ID Process', '\Process(*)\Private Bytes'
+    '\Process(*)\ID Process', '\Process(*)\Private Bytes', '\Process(*)\Handle Count'
 )
 
 function Get-TelemetryPolicy([string]$Path) {
@@ -83,10 +84,10 @@ function Test-TelemetryStorageAccess($Policy,[string]$Path,[bool]$ProtectedDirec
     return (@($allowed|Where-Object {-not $found.ContainsKey($_)}).Count -eq 0)
 }
 
-function Invoke-TelemetryStoreSnapshot([scriptblock]$Action) {
+function Invoke-TelemetryStoreSnapshot($Policy,[scriptblock]$Action) {
     # Same installed mutex as pinned source-v1/RunStore.cs. Caller order is
     # telemetry -> store; never keep this gate across child runner/COM calls.
-    $gate=[Threading.Mutex]::new($false,'Global\AgentExec-RuntimeStore-v1'); $held=$false
+    $gate=Open-TelemetryMutex $Policy 'Global\AgentExec-RuntimeStore-v1'; $held=$false
     try {
         try { $held=$gate.WaitOne([timespan]::FromSeconds(10)) } catch [Threading.AbandonedMutexException] { $held=$true }
         if (-not $held) { throw 'Runtime store is busy; no storage snapshot or ACL mutation.' }
@@ -94,58 +95,51 @@ function Invoke-TelemetryStoreSnapshot([scriptblock]$Action) {
     } finally { if ($held) { $gate.ReleaseMutex() }; $gate.Dispose() }
 }
 
-function Assert-TelemetryRuntimeLeaves($Policy,[string]$Runtime) {
-    # Consumer validation of deployed v1 Inspect/IsTemp/ReceiptDate only.
-    # RunStore remains the owner of record contents and state transitions.
-    $temps=0; $active=0; $receipts=0; $bytes=[long]0
-    $pending=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
-    foreach ($dir in Get-ChildItem -LiteralPath $Runtime -Force) {
-        if (-not $dir.PSIsContainer -or $dir.Name -cnotin @('requests','active','receipts')) { throw 'Unknown runtime storage namespace; ACL preserved.' }
-        foreach ($file in Get-ChildItem -LiteralPath $dir.FullName -Force) {
-            Assert-TelemetryPath $file.FullName $Runtime | Out-Null
-            if ($file.PSIsContainer) { throw 'Unknown nested runtime storage directory; ACL preserved.' }
-            $temp=$file.Name -cmatch '^\.tmp-[0-9a-fA-F]{32}\.tmp$'
-            $maximum=524288
-            if ($temp) { $temps++ }
-            elseif ($dir.Name -eq 'receipts') {
-                if ($file.Name -cnotmatch '^(\d{8}T\d{13}Z)-[0-9a-fA-F]{32}\.jsonl$') { throw 'Unknown v1 receipt file; ACL preserved.' }
-                $date=[datetime]::ParseExact($Matches[1],"yyyyMMdd'T'HHmmssfffffff'Z'",[Globalization.CultureInfo]::InvariantCulture,([Globalization.DateTimeStyles]::AssumeUniversal -bor [Globalization.DateTimeStyles]::AdjustToUniversal))
-                if ($date -gt [datetime]::UtcNow.AddMinutes(5)) { throw 'Future v1 receipt filename; ACL preserved.' }
-            } else {
-                if ($file.BaseName -cnotmatch '^[0-9a-f]{32}$') { throw 'Unknown v1 runtime file; ACL preserved.' }
-                if ($dir.Name -eq 'requests') {
-                    if ($file.Extension -cin @('.json','.ps1')) { $maximum=65536 }
-                    elseif ($file.Extension -ceq '.claimed') { $maximum=1024 }
-                    else { throw 'Unknown v1 request extension; ACL preserved.' }
-                    $null=$pending.Add($file.BaseName)
-                } else {
-                    if ($file.Extension -ceq '.json') { $maximum=4096 }
-                    elseif ($file.Extension -ceq '.cancel') { $maximum=0 }
-                    else { throw 'Unknown v1 active extension; ACL preserved.' }
-                    $active++
-                }
-            }
-            if ($dir.Name -eq 'receipts' -and -not $temp) { $receipts++ }
-            if ($file.Length -gt $maximum) { throw 'V1 runtime file quota violated; ACL preserved.' }
-            $bytes += [long]$file.Length
-        }
+function Get-TelemetryRuntimeOwner($Policy) {
+    $name=[string]$Policy.execution.binary_name
+    if($name -notmatch '^agent-exec\.v[0-9]+\.exe$'){throw 'Invalid runtime owner artifact identity.'}
+    $runner=Join-Path (Split-Path -Parent $script:TelemetryScriptPath) $name
+    if(-not(Test-Path -LiteralPath $runner -PathType Leaf)){throw 'Runtime storage owner is not installed.'}
+    if($null -eq $script:TelemetryRuntimeOwner -or $script:TelemetryRuntimeOwner.Path -cne $runner){
+        # Invoke the installed owner's public primitive. Loading bytes avoids
+        # locking the immutable artifact against operator replacement/rollback.
+        $assembly=[Reflection.Assembly]::Load([IO.File]::ReadAllBytes($runner))
+        $method=$assembly.GetType('AgentExecution.RunStore',$true).GetMethod('InspectStorage',[type[]]@([string],[long],[string]))
+        if($null -eq $method -or -not $method.IsPublic -or -not $method.IsStatic){throw 'Installed runtime owner lacks structural inspection.'}
+        $openMutex=$assembly.GetType('AgentExecution.SharedMutex',$true).GetMethod('Open',[type[]]@([string],[string]))
+        if($null -eq $openMutex -or -not $openMutex.IsPublic -or -not $openMutex.IsStatic){throw 'Installed runtime owner lacks shared mutex access.'}
+        $script:TelemetryRuntimeOwner=[pscustomobject]@{Path=$runner;Method=$method;OpenMutex=$openMutex}
     }
-    if ($temps -gt 1 -or $pending.Count -gt 32 -or $active -gt 32 -or $receipts -gt 8 -or $bytes -gt $Policy.retention.runtime_max_bytes) { throw 'V1 runtime quota violated; ACL preserved.' }
+    return $script:TelemetryRuntimeOwner
 }
 
-function Get-TelemetryStoragePaths($Policy) {
+function Open-TelemetryMutex($Policy,[string]$Name) {
+    try{return (Get-TelemetryRuntimeOwner $Policy).OpenMutex.Invoke($null,[object[]]@($Name,[string]$Policy.storage_owner_sid))}
+    catch [Reflection.TargetInvocationException]{throw $_.Exception.InnerException}
+}
+
+function Get-TelemetryRuntimeInspection($Policy) {
+    try{return (Get-TelemetryRuntimeOwner $Policy).Method.Invoke($null,[object[]]@([string]$Policy.data_root,[long]$Policy.retention.runtime_max_bytes,[string]$Policy.storage_owner_sid))}
+    catch [Reflection.TargetInvocationException]{throw $_.Exception.InnerException}
+}
+
+function Get-TelemetryStoragePaths($Policy,$RuntimeInspection=$null) {
     $root = Assert-TelemetryPath $Policy.data_root $Policy.data_root
     if (-not (Test-Path -LiteralPath $root -PathType Container)) { return @() }
     # Validate the whole owned namespace before changing any existing ACL.
+    $runtime = Join-Path $root 'runtime'
+    if(Test-Path -LiteralPath $runtime){
+        Assert-TelemetryPath $runtime $root | Out-Null
+        $inspection=Get-TelemetryRuntimeInspection $Policy
+        if($null -ne $RuntimeInspection){$RuntimeInspection.Value=$inspection}
+    }
     $rows = @(Get-TelemetryInventory $Policy)
     $paths = @([pscustomobject]@{Path=$root;Directory=$true;Protected=$true})
     foreach ($name in @('active','history','incidents','runtime')) {
         $path = Join-Path $root $name
         if (Test-Path -LiteralPath $path) { $paths += [pscustomobject]@{Path=$path;Directory=$true;Protected=$true} }
     }
-    $runtime = Join-Path $root 'runtime'
     if (Test-Path -LiteralPath $runtime) {
-        Assert-TelemetryRuntimeLeaves $Policy $runtime
         foreach ($child in Get-ChildItem -LiteralPath $runtime -Force) {
             if (-not $child.PSIsContainer -or $child.Name -notin @('requests','active','receipts')) { throw 'Unknown runtime storage namespace; ACL preserved.' }
             if (@(Get-ChildItem -LiteralPath $child.FullName -Directory -Force).Count) { throw 'Unknown nested runtime storage directory; ACL preserved.' }
@@ -157,7 +151,7 @@ function Get-TelemetryStoragePaths($Policy) {
 }
 
 function Initialize-TelemetryRoot($Policy) {
-    Invoke-TelemetryStoreSnapshot {
+    Invoke-TelemetryStoreSnapshot $Policy {
     $root = Assert-TelemetryPath $Policy.data_root $Policy.data_root
     $known = @(Get-TelemetryStoragePaths $Policy)
     $privateDirectory = New-TelemetryStorageSecurity $Policy $true
@@ -319,21 +313,21 @@ function Assert-TelemetryCollectorConfiguration($Policy, $Collector) {
     }
 }
 
-function Write-TelemetryState($Policy) {
-    $state = @{ started_utc=[datetime]::UtcNow.ToString('o') } | ConvertTo-Json -Compress
+function Write-TelemetryState($Policy,[bool]$Incident=$false) {
+    $state = @{ started_utc=[datetime]::UtcNow.ToString('o'); retention_class=$(if($Incident){'incident'}else{'ordinary'}) } | ConvertTo-Json -Compress
     $path = Join-Path $Policy.data_root 'active\current.json'
     if ([Text.Encoding]::UTF8.GetByteCount($state) -gt 1024) { throw 'Active state exceeds bound.' }
     [IO.File]::WriteAllText($path,$state,[Text.UTF8Encoding]::new($false))
 }
 
-function Start-TelemetryCollector($Policy) {
+function Start-TelemetryCollector($Policy,[bool]$Incident=$false) {
     Invoke-TelemetryPrune $Policy
     $dcs = Get-TelemetryCollector $Policy
     if ($null -eq $dcs) { throw 'Collector is not installed.' }
     Assert-TelemetryCollectorConfiguration $Policy $dcs
     if ($dcs.Status -eq 1) { return }
     if ($dcs.Status -ne 0) { throw 'Collector is transitioning; do not duplicate it.' }
-    Write-TelemetryState $Policy
+    Write-TelemetryState $Policy $Incident
     $dcs.Start($true)
     $dcs.Query($Policy.monitor.collector_name,$null)
     if ($dcs.Status -ne 1) { throw 'Own collector did not enter Running.' }
@@ -351,7 +345,8 @@ function Move-TelemetryActive($Policy, [bool]$Incident) {
         $started = [datetime]::Parse($state.started_utc,[Globalization.CultureInfo]::InvariantCulture,[Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime()
         $file = Get-Item -LiteralPath $live
         Invoke-TelemetryPrune $Policy $file.Length
-        $bucket = if ($Incident) { 'incidents' } else { 'history' }
+        $retainedIncident = $state.PSObject.Properties.Name -contains 'retention_class' -and $state.retention_class -eq 'incident'
+        $bucket = if ($Incident -or $retainedIncident) { 'incidents' } else { 'history' }
         $name = 'ae-' + $started.ToString("yyyyMMdd'T'HHmmssfff'Z'") + '-' + [guid]::NewGuid().ToString('N').Substring(0,8) + '.blg'
         $target = Join-Path (Join-Path $Policy.data_root $bucket) $name
         Move-Item -LiteralPath $live -Destination $target
@@ -519,17 +514,49 @@ function Archive-TelemetryEvidence($Policy, [string]$Directory, [string]$Manifes
     }
 }
 
+function Get-TelemetryErrorCategory($Policy) {
+    $path=Join-Path $Policy.data_root 'active\last-error.json'
+    if(-not(Test-Path -LiteralPath $path)){return $null}
+    try{
+        $state=Get-Content -LiteralPath $path -Raw -Encoding UTF8|ConvertFrom-Json
+        if($state.PSObject.Properties.Name -contains 'category'){return $state.category}
+        return 'legacy'
+    }catch{return 'invalid'}
+}
+
+function Write-TelemetryFailure($Policy,[string]$Operation,[Exception]$Error,[string]$Category='telemetry') {
+    $failure=[pscustomobject]@{time_utc=[datetime]::UtcNow.ToString('o');operation=$Operation;category=$Category;error_type=$Error.GetType().Name;message=$Error.Message.Substring(0,[Math]::Min(800,$Error.Message.Length))}|ConvertTo-Json -Compress
+    if([Text.Encoding]::UTF8.GetByteCount($failure) -gt 4096){throw 'Telemetry failure state exceeds its bound.'}
+    $path=Assert-TelemetryPath (Join-Path $Policy.data_root 'active\last-error.json') $Policy.data_root
+    [IO.File]::WriteAllText($path,$failure,[Text.UTF8Encoding]::new($false))
+}
+
+function Assert-TelemetryObservationStorage($Policy) {
+    Invoke-TelemetryStoreSnapshot $Policy {
+        $paths=@(Get-TelemetryStoragePaths $Policy)
+        foreach($name in @('active','history','incidents','runtime')){if(-not(Test-Path -LiteralPath (Join-Path $Policy.data_root $name) -PathType Container)){throw 'Observation storage bucket is missing.'}}
+        if(@($paths|Where-Object {-not(Test-TelemetryStorageAccess $Policy $_.Path $_.Protected)}).Count){throw 'Observation storage ownership or ACL is unconfirmed.'}
+        $rows=@(Get-TelemetryInventory $Policy)
+        if((Get-TelemetryBytes $rows @('active')) -gt $Policy.retention.active_reserved_bytes -or (Get-TelemetryBytes $rows @('runtime')) -gt $Policy.retention.runtime_max_bytes -or (Get-TelemetryBytes $rows @('history','incidents')) -gt $Policy.retention.closed_max_bytes){throw 'Observation storage budget invalid.'}
+    }
+}
+
 function Get-TelemetryStatus($Policy) {
-    $storage=Invoke-TelemetryStoreSnapshot {
-    $rows = @(Get-TelemetryInventory $Policy)
+    $storage=Invoke-TelemetryStoreSnapshot $Policy {
     $gaps = @()
+    $runtimeInspection=$null
     if (-not (Test-Path -LiteralPath $Policy.data_root -PathType Container)) { $gaps += 'StorageRootMissing' }
     else {
-        $paths = @(Get-TelemetryStoragePaths $Policy)
+        $paths = @(Get-TelemetryStoragePaths $Policy ([ref]$runtimeInspection))
         if (@($paths|Where-Object {-not (Test-TelemetryStorageAccess $Policy $_.Path $_.Protected)}).Count) { $gaps += 'StorageAclDrift' }
         foreach ($name in @('active','history','incidents','runtime')) { if (-not (Test-Path -LiteralPath (Join-Path $Policy.data_root $name) -PathType Container)) { $gaps += 'StorageDirectoryMissing'; break } }
     }
-    [pscustomobject]@{Rows=$rows;Gaps=$gaps}
+    if($null -ne $runtimeInspection -and -not $runtimeInspection.logical_quota_valid){$gaps+='RuntimeRecoveryRequired'}
+    $errorCategory=Get-TelemetryErrorCategory $Policy
+    if($errorCategory -eq 'runtime'){$gaps+='RuntimeMaintenanceFailed'}
+    elseif($errorCategory -eq 'invalid'){$gaps+='TelemetryErrorStateInvalid'}
+    $rows=@(Get-TelemetryInventory $Policy)
+    [pscustomobject]@{Rows=$rows;Gaps=$gaps;RuntimeInspection=$runtimeInspection}
     }
     $rows=@($storage.Rows); $gaps=@($storage.Gaps)
     $dcs = Get-TelemetryCollector $Policy
@@ -544,7 +571,7 @@ function Get-TelemetryStatus($Policy) {
     if ($active -gt [long]$Policy.retention.active_reserved_bytes) { $gaps += 'ActiveBudgetExceeded' }
     if ($closed -gt [long]$Policy.retention.closed_max_bytes) { $gaps += 'ClosedBudgetExceeded' }
     if ($runtime -gt [long]$Policy.retention.runtime_max_bytes) { $gaps += 'RuntimeBudgetExceeded' }
-    [pscustomobject]@{ collector=$Policy.monitor.collector_name; collector_state=$state; data_root=$Policy.data_root; active_bytes=$active; closed_bytes=$closed; runtime_bytes=$runtime; discovered_total_bytes=($active+$closed+$runtime); hard_limit_bytes=[long]$Policy.retention.total_bytes; reserved_upper_bytes=([long]$Policy.retention.active_reserved_bytes+$closed+[long]$Policy.retention.runtime_max_bytes+[long]$Policy.retention.margin_bytes); retained_files=$rows.Count; gaps=$gaps; checked_utc=[datetime]::UtcNow.ToString('o') }
+    [pscustomobject]@{ collector=$Policy.monitor.collector_name; collector_state=$state; data_root=$Policy.data_root; active_bytes=$active; closed_bytes=$closed; runtime_bytes=$runtime; runtime_storage=$storage.RuntimeInspection; discovered_total_bytes=($active+$closed+$runtime); hard_limit_bytes=[long]$Policy.retention.total_bytes; reserved_upper_bytes=([long]$Policy.retention.active_reserved_bytes+$closed+[long]$Policy.retention.runtime_max_bytes+[long]$Policy.retention.margin_bytes); retained_files=$rows.Count; gaps=$gaps; checked_utc=[datetime]::UtcNow.ToString('o') }
 }
 
 function Get-TelemetryTaskNames($Policy) { return @(($Policy.monitor.collector_name+'-Maintenance'), ($Policy.monitor.collector_name+'-Incident')) }
@@ -575,16 +602,37 @@ function Install-TelemetryTasks($Policy, [string]$PolicyFile) {
     foreach ($item in $definitions) { Register-ScheduledTask -TaskName $item.Name -InputObject $item.Definition -Force | Out-Null }
 }
 
+function Uninstall-TelemetryOwners($Policy) {
+    # Rollback must remain available when stored runtime records are broken.
+    # Validate every native owner before stopping/removing anything; no data
+    # initialization, retention pruning or record parsing belongs on this path.
+    $collector=Get-TelemetryCollector $Policy
+    $inventory=@(Get-ScheduledTask -TaskPath '\' -ErrorAction Stop)
+    $ownedNames=[Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
+    foreach($name in Get-TelemetryTaskNames $Policy){$null=$ownedNames.Add($name)}
+    $tasks=@($inventory|Where-Object {$ownedNames.Contains([string]$_.TaskName)})
+    foreach($task in $tasks){if($task.Description -ne $script:TelemetryOwner){throw "Refusing foreign scheduled task: $($task.TaskName)"}}
+    Stop-TelemetryCollector $Policy
+    foreach($task in $tasks){Unregister-ScheduledTask -TaskName $task.TaskName -Confirm:$false}
+    if($null -ne $collector -and $null -ne (Get-TelemetryCollector $Policy)){Invoke-TelemetryLogman @('delete',$Policy.monitor.collector_name)}
+    return [pscustomobject]@{uninstalled=$true;diagnostics_preserved=$true;data_root=$Policy.data_root}
+}
+
 function Invoke-TelemetryCommand($Policy, [string]$Operation, [string]$PolicyFile, [string]$Directory, [string]$Path) {
     $hash = [Security.Cryptography.SHA256]::Create()
     $key = ([BitConverter]::ToString($hash.ComputeHash([Text.Encoding]::UTF8.GetBytes($Policy.data_root.ToLowerInvariant())))).Replace('-','').Substring(0,24)
-    $mutex = New-Object Threading.Mutex($false,('Global\AgentExecutionTelemetry-'+$key))
+    $mutex = Open-TelemetryMutex $Policy ('Global\AgentExecutionTelemetry-'+$key)
     $locked = $false
     try {
         try { $locked = $mutex.WaitOne([timespan]::FromSeconds(20)) } catch [Threading.AbandonedMutexException] { $locked = $true }
         if (-not $locked) { throw 'Telemetry owner busy; no concurrent mutation.' }
+        if($Operation -eq 'uninstall'){return Uninstall-TelemetryOwners $Policy}
         if ($Operation -eq 'status') { return Get-TelemetryStatus $Policy }
-        Initialize-TelemetryRoot $Policy
+        try{Initialize-TelemetryRoot $Policy}
+        catch{
+            if($Operation -ne 'initialize-storage'){try{Stop-TelemetryCollector $Policy}catch{}}
+            throw
+        }
         if ($Operation -eq 'initialize-storage') { return [pscustomobject]@{storage_initialized=$true;data_root=$Policy.data_root;storage_owner_sid=$Policy.storage_owner_sid} }
         if ($Operation -eq 'archive-evidence') {
             try { return Archive-TelemetryEvidence $Policy $Directory $Path }
@@ -593,13 +641,13 @@ function Invoke-TelemetryCommand($Policy, [string]$Operation, [string]$PolicyFil
                 # Bad source input must not stop a healthy unrelated collector.
                 # Fail closed only when diagnostics inventory/budgets are broken.
                 try {
-                    $rows = @(Get-TelemetryInventory $Policy)
-                    if ((Get-TelemetryBytes $rows @('active')) -gt $Policy.retention.active_reserved_bytes -or (Get-TelemetryBytes $rows @('runtime')) -gt $Policy.retention.runtime_max_bytes -or (Get-TelemetryBytes $rows @('history','incidents')) -gt $Policy.retention.closed_max_bytes) { throw 'Archive diagnostics budget invalid.' }
+                    Assert-TelemetryObservationStorage $Policy
                 } catch { try { Stop-TelemetryCollector $Policy } catch { } }
                 throw $archiveError
             }
         }
         try {
+            $runtimeFailed=$false
             Invoke-TelemetryPrune $Policy
             switch ($Operation) {
                 'maintenance' {
@@ -610,8 +658,15 @@ function Invoke-TelemetryCommand($Policy, [string]$Operation, [string]$PolicyFil
                         if ($binary -notmatch '^agent-exec\.v[0-9]+\.exe$') { throw 'Invalid execution artifact identity.' }
                         $runner = Join-Path (Split-Path -Parent $script:TelemetryScriptPath) $binary
                         if (-not (Test-Path -LiteralPath $runner -PathType Leaf)) { throw 'Runtime retention owner is not installed.' }
-                        & $runner maintain --policy ([IO.Path]::GetFullPath($PolicyFile))
-                        if ($LASTEXITCODE -ne 0) { throw 'Runtime retention failed; observation remains stopped.' }
+                        try{
+                            & $runner maintain --policy ([IO.Path]::GetFullPath($PolicyFile))
+                            if ($LASTEXITCODE -ne 0) { throw 'Runtime retention failed.' }
+                        }catch{
+                            # Child owns all semantic recovery. A failed record
+                            # must not stop healthy, physically bounded sampling.
+                            Assert-TelemetryObservationStorage $Policy
+                            $runtimeFailed=$true
+                        }
                     }
                     $dcs = Get-TelemetryCollector $Policy
                     if ($null -eq $dcs) { throw 'Collector is not installed.' }
@@ -623,31 +678,20 @@ function Invoke-TelemetryCommand($Policy, [string]$Operation, [string]$PolicyFil
                     } else { throw 'Running collector has no earliest-data state.' }
                     Start-TelemetryCollector $Policy
                 }
-                'incident' { Move-TelemetryActive $Policy $true; Start-TelemetryCollector $Policy }
+                'incident' { Move-TelemetryActive $Policy $true; Start-TelemetryCollector $Policy $true }
                 'import-artifact' { Import-TelemetryArtifact $Policy $Directory $Path | Out-Null }
                 'install' { New-TelemetryCollector $Policy; Install-TelemetryTasks $Policy $PolicyFile }
-                'uninstall' {
-                    Stop-TelemetryCollector $Policy
-                    foreach ($name in Get-TelemetryTaskNames $Policy) {
-                        $task = Get-ScheduledTask -TaskPath '\' -TaskName $name -ErrorAction SilentlyContinue
-                        if ($task) {
-                            if ($task.Description -ne $script:TelemetryOwner) { throw "Refusing foreign scheduled task: $name" }
-                            Unregister-ScheduledTask -TaskName $name -Confirm:$false
-                        }
-                    }
-                    if ($null -ne (Get-TelemetryCollector $Policy)) { Invoke-TelemetryLogman @('delete',$Policy.monitor.collector_name) }
-                }
+            }
+            if($Operation -eq 'maintenance'){
+                if($runtimeFailed){Write-TelemetryFailure $Policy $Operation ([InvalidOperationException]::new('Runtime maintenance failed; structural storage remains safe.')) 'runtime'}
+                elseif((Get-TelemetryErrorCategory $Policy) -eq 'runtime'){Remove-Item -LiteralPath (Join-Path $Policy.data_root 'active\last-error.json') -Force}
             }
             Invoke-TelemetryPrune $Policy
             return Get-TelemetryStatus $Policy
         } catch {
             # A quota/cleanup/identity failure must not leave an owned writer running.
             try { Stop-TelemetryCollector $Policy } catch { }
-            $failure = [pscustomobject]@{ time_utc=[datetime]::UtcNow.ToString('o'); operation=$Operation; error_type=$_.Exception.GetType().Name; message=$_.Exception.Message.Substring(0,[Math]::Min(800,$_.Exception.Message.Length)) } | ConvertTo-Json -Compress
-            if ([Text.Encoding]::UTF8.GetByteCount($failure) -le 4096) {
-                $failurePath = Assert-TelemetryPath (Join-Path $Policy.data_root 'active\last-error.json') $Policy.data_root
-                [IO.File]::WriteAllText($failurePath,$failure,[Text.UTF8Encoding]::new($false))
-            }
+            Write-TelemetryFailure $Policy $Operation $_.Exception
             throw
         }
     } finally {

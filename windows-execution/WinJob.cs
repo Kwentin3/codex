@@ -38,6 +38,17 @@ namespace AgentExecution
         private const uint WaitObject = 0, WaitTimeout = 258;
         private static readonly IntPtr InvalidHandle = new IntPtr(-1);
 
+        public static bool WriteNotice(string text, int maxBytes)
+        {
+            if (maxBytes < 0) throw new ArgumentOutOfRangeException("maxBytes");
+            if (String.IsNullOrEmpty(text) || maxBytes == 0) return true;
+            int count = Math.Min(text.Length, maxBytes);
+            byte[] bytes = new byte[count];
+            Encoding.ASCII.GetBytes(text, 0, count, bytes, 0);
+            return Worker.Notice(bytes);
+        }
+
+
         public static RunResult Run(RunSpec input)
         {
             if (input == null) throw new ArgumentNullException("input");
@@ -58,6 +69,7 @@ namespace AgentExecution
             Worker stdout = null, stderr = null, stdin = null;
             bool assigned = false, handlerAttached = false;
             int interrupted = 0;
+            long nextCancellationCheck = 0;
             string phase = "setup_failed";
             Stopwatch duration = Stopwatch.StartNew();
             ConsoleCancelEventHandler onCancel = delegate(object sender, ConsoleCancelEventArgs e) {
@@ -117,7 +129,7 @@ namespace AgentExecution
                 }
                 else Close(ref pipes.InWrite);
                 phase = "cancellation_check_failed";
-                string stop = StopReason(spec, parent, duration, ref interrupted);
+                string stop = StopReason(spec, parent, duration, ref interrupted, ref nextCancellationCheck);
                 if (stop != null) { result.Reason = stop; result.ExitCode = ReasonExitCode(stop); return result; }
                 phase = "resume_failed";
                 if (ResumeThread(child.Thread) == UInt32.MaxValue) ThrowNative();
@@ -129,7 +141,7 @@ namespace AgentExecution
                     if (stop == null)
                     {
                         phase = "cancellation_check_failed";
-                        stop = StopReason(spec, parent, duration, ref interrupted);
+                        stop = StopReason(spec, parent, duration, ref interrupted, ref nextCancellationCheck);
                         phase = "monitor_failed";
                     }
                     if (stop != null)
@@ -201,6 +213,7 @@ namespace AgentExecution
                 bool ioStopped = FinishWorkers(capture, stdout, stderr, stdin);
                 if (capture != null)
                 {
+                    if (!capture.Completed) capture.MarkClipped();
                     result.StdoutBytes = Interlocked.Read(ref capture.StdoutBytes);
                     result.StderrBytes = Interlocked.Read(ref capture.StderrBytes);
                     result.OutputClipped = capture.Clipped || !ioStopped;
@@ -234,11 +247,17 @@ namespace AgentExecution
             if (!String.IsNullOrEmpty(spec.JobName)) ValidateJobName(spec.JobName);
         }
 
-        private static string StopReason(RunSpec spec, ParentWatch parent, Stopwatch duration, ref int interrupted)
+        private static string StopReason(RunSpec spec, ParentWatch parent, Stopwatch duration,
+            ref int interrupted, ref long nextCancellationCheck)
         {
             if (Interlocked.CompareExchange(ref interrupted, 0, 0) != 0) return "ctrl_c";
             if (parent != null && !parent.IsAlive) return "parent_exit";
-            if (spec.IsCancelled != null && spec.IsCancelled()) return "cancelled";
+            long now = duration.ElapsedMilliseconds;
+            if (spec.IsCancelled != null && now >= nextCancellationCheck)
+            {
+                nextCancellationCheck = now + 500;
+                if (spec.IsCancelled()) return "cancelled";
+            }
             if (duration.ElapsedMilliseconds >= spec.TimeoutMilliseconds) return "timeout";
             return null;
         }
@@ -407,27 +426,161 @@ namespace AgentExecution
 
         private sealed class Capture
         {
-            private readonly long limit;
-            private long reserved;
-            private int clipped;
+            private readonly int limit, headLimit;
+            private readonly object gate = new object();
+            private readonly Tail stdoutTail, stderrTail;
             private readonly Stream stdout = Console.OpenStandardOutput();
             private readonly Stream stderr = Console.OpenStandardError();
+            private int headBytes, clipped, readersFinished, completed, stdoutFailed, stderrFailed;
             public long StdoutBytes, StderrBytes;
-            public Capture(int maxBytes) { limit = maxBytes; }
+
+            public Capture(int maxBytes)
+            {
+                limit = maxBytes;
+                headLimit = Math.Min(16384, maxBytes / 4);
+                // Each stream has a bounded tail; the final shared allowance is
+                // divided between them, borrowing unused space from the other.
+                stdoutTail = new Tail(maxBytes - headLimit);
+                stderrTail = new Tail(maxBytes - headLimit);
+            }
             public bool Clipped { get { return Interlocked.CompareExchange(ref clipped, 0, 0) != 0; } }
+            public bool Completed { get { return Interlocked.CompareExchange(ref completed, 0, 0) != 0; } }
             public void MarkClipped() { Interlocked.Exchange(ref clipped, 1); }
-            public void Publish(byte[] bytes, int count, bool error, ref bool forwardFailed)
+
+            public void Publish(byte[] bytes, int count, bool error, Worker owner)
             {
                 if (error) Interlocked.Add(ref StderrBytes, count);
                 else Interlocked.Add(ref StdoutBytes, count);
-                long start = Interlocked.Add(ref reserved, count) - count;
-                int allowed = (int)Math.Max(0, Math.Min((long)count, limit - start));
-                if (allowed < count || forwardFailed) MarkClipped();
-                if (allowed == 0 || forwardFailed) return;
-                try { (error ? stderr : stdout).Write(bytes, 0, allowed); }
-                catch (Exception) { forwardFailed = true; MarkClipped(); }
+                int head;
+                lock (gate)
+                {
+                    head = Math.Min(count, headLimit - headBytes);
+                    headBytes += head;
+                    (error ? stderrTail : stdoutTail).Append(bytes, head, count - head);
+                    if (Interlocked.Read(ref StdoutBytes) + Interlocked.Read(ref StderrBytes) > limit) MarkClipped();
+                }
+                // Never hold the buffer lock while writing to a possibly full
+                // outer pipe: its own worker remains cancellable.
+                Write(bytes, 0, head, error, owner);
+            }
+
+            public void CompleteReader(Worker owner)
+            {
+                if (Interlocked.Increment(ref readersFinished) != 2) return;
+                // Both readers have finished publishing. Flush from this last
+                // retained worker, so blocked final writes can still be cancelled.
+                try { Flush(owner); }
+                finally { Interlocked.Exchange(ref completed, 1); }
+            }
+
+            private void Flush(Worker owner)
+            {
+                long total = Interlocked.Read(ref StdoutBytes) + Interlocked.Read(ref StderrBytes);
+                if (!Clipped)
+                {
+                    WriteTail(stdoutTail, stdoutTail.Count, false, owner);
+                    WriteTail(stderrTail, stderrTail.Count, true, owner);
+                    return;
+                }
+                int available = limit - headBytes;
+                int style = 0;
+                byte[] marker = new byte[0];
+                if (available > 0)
+                {
+                    // Choose a form using the largest possible omission count,
+                    // then keep that form while its digit count settles.
+                    while (style < 3 && Marker(style, total - headBytes, total).Length > available) style++;
+                    marker = Encoding.ASCII.GetBytes(Marker(style, total - headBytes, total));
+                }
+                int output = 0, error = 0;
+                for (int i = 0; i < 24; i++)
+                {
+                    DivideTail(Math.Max(0, available - marker.Length), out output, out error);
+                    byte[] adjusted = available == 0 ? marker :
+                        Encoding.ASCII.GetBytes(Marker(style, total - headBytes - output - error, total));
+                    bool settled = adjusted.Length == marker.Length;
+                    marker = adjusted;
+                    if (settled) break;
+                }
+                // The control notice is stderr; retained child bytes always
+                // remain on their original stdout/stderr channel.
+                Write(marker, 0, marker.Length, true, owner);
+                WriteTail(stdoutTail, output, false, owner);
+                WriteTail(stderrTail, error, true, owner);
+            }
+
+            private void DivideTail(int available, out int output, out int error)
+            {
+                output = Math.Min(stdoutTail.Count, (available + 1) / 2);
+                error = Math.Min(stderrTail.Count, available / 2);
+                int spare = available - output - error;
+                int more = Math.Min(stdoutTail.Count - output, spare);
+                output += more; spare -= more;
+                error += Math.Min(stderrTail.Count - error, spare);
+            }
+
+            private static string Marker(int style, long omitted, long observed)
+            {
+                string drop = omitted.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                string total = observed.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                if (style == 0) return "\n[agent-exec: output clipped; omitted by limit=" + drop + " bytes; observed=" + total + " bytes]\n";
+                if (style == 1) return "[clipped " + drop + " of " + total + " bytes]\n";
+                if (style == 2) return "!" + total;
+                // A zero cap emits nothing. Smaller nonzero caps cannot contain
+                // a complete count, but still show clipping; receipts keep totals.
+                return "!";
+            }
+
+            private void WriteTail(Tail tail, int count, bool error, Worker owner)
+            {
+                if (count == 0) return;
+                int start = (tail.Start + tail.Count - count) % tail.Bytes.Length;
+                int first = Math.Min(count, tail.Bytes.Length - start);
+                Write(tail.Bytes, start, first, error, owner);
+                Write(tail.Bytes, 0, count - first, error, owner);
+            }
+
+            private void Write(byte[] bytes, int offset, int count, bool error, Worker owner)
+            {
+                if (count == 0) return;
+                if (owner.IsStopping) { MarkClipped(); return; }
+                int failed = error ? Interlocked.CompareExchange(ref stderrFailed, 0, 0) :
+                    Interlocked.CompareExchange(ref stdoutFailed, 0, 0);
+                if (failed != 0) return;
+                try { (error ? stderr : stdout).Write(bytes, offset, count); }
+                catch (Exception)
+                {
+                    if (error) Interlocked.Exchange(ref stderrFailed, 1);
+                    else Interlocked.Exchange(ref stdoutFailed, 1);
+                    MarkClipped();
+                }
+            }
+
+            private sealed class Tail
+            {
+                public readonly byte[] Bytes;
+                public int Start, Count;
+                public Tail(int capacity) { Bytes = new byte[capacity]; }
+                public void Append(byte[] source, int offset, int count)
+                {
+                    if (count == 0 || Bytes.Length == 0) return;
+                    if (count >= Bytes.Length)
+                    {
+                        Buffer.BlockCopy(source, offset + count - Bytes.Length, Bytes, 0, Bytes.Length);
+                        Start = 0; Count = Bytes.Length; return;
+                    }
+                    int drop = Math.Max(0, Count + count - Bytes.Length);
+                    Start = (Start + drop) % Bytes.Length;
+                    Count -= drop;
+                    int index = (Start + Count) % Bytes.Length;
+                    int first = Math.Min(count, Bytes.Length - index);
+                    Buffer.BlockCopy(source, offset, Bytes, index, first);
+                    Buffer.BlockCopy(source, offset + first, Bytes, 0, count - first);
+                    Count += count;
+                }
             }
         }
+
 
         private sealed class Worker
         {
@@ -437,7 +590,7 @@ namespace AgentExecution
             private readonly object nativeHandleLock = new object();
             private int initialized, initializationError;
             private Worker() { }
-            private void Start(ThreadStart action)
+            private void Start(ThreadStart action, int startupTimeoutMilliseconds = 1000)
             {
                 thread = new Thread(delegate() {
                     IntPtr retained;
@@ -457,32 +610,74 @@ namespace AgentExecution
                 Stopwatch wait = Stopwatch.StartNew();
                 while (Interlocked.CompareExchange(ref initialized, 0, 0) == 0)
                 {
-                    if (wait.ElapsedMilliseconds >= 1000) { Cancel(); throw new Win32Exception(1460); }
+                    if (wait.ElapsedMilliseconds >= startupTimeoutMilliseconds) { Cancel(); throw new Win32Exception(1460); }
                     Thread.Sleep(1);
                 }
                 if (initializationError != 0) throw new Win32Exception(initializationError);
             }
+            public static bool Notice(byte[] bytes)
+            {
+                Worker worker = new Worker();
+                Stopwatch wait = Stopwatch.StartNew();
+                int written = 0;
+                bool stopped = false;
+                try
+                {
+                    worker.Start(delegate() {
+                        try
+                        {
+                            // Do not close the process standard stream: another
+                            // bounded executor notice may follow this one.
+                            Console.OpenStandardError().Write(bytes, 0, bytes.Length);
+                            Interlocked.Exchange(ref written, 1);
+                        }
+                        catch (Exception) { }
+                    }, 50);
+                    stopped = worker.Join(Math.Max(0, 200 - (int)wait.ElapsedMilliseconds));
+                }
+                catch (Exception)
+                {
+                    // This helper owns only its fixed control notice. Failure
+                    // to publish it must not block native cleanup or receipts.
+                }
+                finally
+                {
+                    if (worker.thread != null && worker.thread.IsAlive)
+                    {
+                        worker.Cancel();
+                        stopped = worker.Join(Math.Max(0, 250 - (int)wait.ElapsedMilliseconds));
+                    }
+                    else stopped = true;
+                }
+                return stopped && Interlocked.CompareExchange(ref written, 0, 0) != 0;
+            }
+
+
             public static Worker ReadOutput(IntPtr source, Capture capture, bool error)
             {
                 Worker worker = new Worker();
                 worker.Start(delegate() {
                     byte[] bytes = new byte[16384];
-                    bool forwardFailed = false;
-                    while (!worker.stopping)
+                    try
                     {
-                        uint read;
-                        if (!ReadFile(source, bytes, (uint)bytes.Length, out read, IntPtr.Zero))
+                        while (!worker.stopping)
                         {
-                            int code = Marshal.GetLastWin32Error();
-                            if (code != 109 && code != 232 && code != 995) capture.MarkClipped();
-                            break;
+                            uint read;
+                            if (!ReadFile(source, bytes, (uint)bytes.Length, out read, IntPtr.Zero))
+                            {
+                                int code = Marshal.GetLastWin32Error();
+                                if (code != 109 && code != 232 && code != 995) capture.MarkClipped();
+                                break;
+                            }
+                            if (read == 0) break;
+                            capture.Publish(bytes, (int)read, error, worker);
                         }
-                        if (read == 0) break;
-                        capture.Publish(bytes, (int)read, error, ref forwardFailed);
                     }
+                    finally { capture.CompleteReader(worker); }
                 });
                 return worker;
             }
+
             public static Worker ForwardInput(IntPtr destination)
             {
                 Worker worker = new Worker();
@@ -525,6 +720,7 @@ namespace AgentExecution
                 lock (nativeHandleLock)
                     if (nativeHandle != IntPtr.Zero) CancelSynchronousIo(nativeHandle);
             }
+            public bool IsStopping { get { return stopping; } }
             public bool IsAlive { get { return thread.IsAlive; } }
             public bool Join(int milliseconds) { return thread.Join(milliseconds); }
         }

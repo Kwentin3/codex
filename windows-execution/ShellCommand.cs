@@ -44,7 +44,12 @@ namespace AgentExecution
                     ". ([ScriptBlock]::Create([IO.File]::ReadAllText('" + scriptPath.Replace("'", "''") + "',[Text.Encoding]::UTF8)))";
                 arguments = "-NoLogo" + profile + " -NonInteractive -Command " + QuoteWindows(script);
             }
-            else if (name == "cmd") arguments = "/d /s /c \"" + command + "\"";
+            else if (name == "cmd")
+            {
+                if (command.IndexOf('\r') >= 0 || command.IndexOf('\n') >= 0)
+                    throw new ArgumentException("cmd_multiline_not_supported");
+                arguments = "/d /s /c \"" + command + "\"";
+            }
             else if (name == "bash" || name == "sh")
             {
                 string login = BashLogin(parentCommand) ? "-l " : "";

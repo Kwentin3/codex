@@ -13,6 +13,7 @@
 __pycache__/
 .pytest_cache/
 .venv/
+.local/
 windows-execution/policy.json
 windows-execution/rollback/
 windows-execution/acceptance.json

@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 $package = Split-Path -Parent $PSScriptRoot
 if (-not $TelemetryPath) { $TelemetryPath=Join-Path $package 'telemetry.ps1' }
 if (-not $PolicyPath) { $PolicyPath=Join-Path $package 'policy.json' }
+if (-not (Test-Path -LiteralPath $PolicyPath)) { throw 'Pass an explicit fixture PolicyPath; source snapshots contain no private policy.' }
 . $TelemetryPath -PolicyPath $PolicyPath
 $installed = Get-TelemetryPolicy $PolicyPath
 $testRoot = Join-Path (Split-Path -Parent $installed.data_root) ('AgentExecutionEvidenceTest-'+[guid]::NewGuid().ToString('N'))

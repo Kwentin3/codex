@@ -65,7 +65,7 @@ namespace AgentExecution
                 // Input/tool JSON and command text can contain credentials. Never echo either.
                 if (args.Length > 1 && args[0] == "hook")
                     return Deny(args[1], "Agent execution control could not validate this request (" + error.GetType().Name + ").");
-                Console.Error.WriteLine("agent-exec: rejected or failed (" + error.GetType().Name + ").");
+                WinJob.WriteNotice("agent-exec: rejected or failed (" + error.GetType().Name + ").\n", 192);
                 return 125;
             }
         }
@@ -109,20 +109,26 @@ namespace AgentExecution
             if (allowed.Success)
             {
                 int seconds = Int32.Parse(allowed.Groups[3].Value);
+                string source;
                 if (readable)
                 {
-                    string source = allowed.Groups[4].Value;
+                    source = allowed.Groups[4].Value;
                     if (source.Contains("'@")) return Deny(agent, "The literal contains a here-string terminator token. Use the exact base64 form.");
                     DecodePayload(Convert.ToBase64String(new UTF8Encoding(false, true).GetBytes(source)));
                 }
-                else DecodePayload(allowed.Groups[4].Value);
+                else source = DecodePayload(allowed.Groups[4].Value);
+                if (allowed.Groups[2].Value == "cmd" && HasNewline(source))
+                    return Deny(agent, "cmd_multiline_not_supported: submit a single cmd line or use a PowerShell script.");
                 if (seconds < 1 || seconds > policy.MaximumTimeoutSeconds)
                     return Deny(agent, "Requested command deadline exceeds the shared policy.");
                 // A gate must never rewrite source or grant approval. The native client assesses
                 // precisely the managed command its agent submitted, under its existing policy.
                 return Pass(agent);
             }
-            return Deny(agent, "Use the shared managed command route described in C:/Users/Администратор/.agents/windows-execution/README.md: " + executable + " inline --owner TASK --shell powershell --timeout SECONDS --command-base64 UTF8_BASE64. Submit one exact invocation with no shell operators; keep Cwd on the native tool.");
+            return Deny(agent, "Use the shared managed route in " + Path.Combine(Home, "README.md").Replace('\\', '/') +
+                ". Prefer this readable literal form with actual newlines: " + executable +
+                " inline --owner TASK --shell powershell --timeout SECONDS --command-base64 ([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(@'\nSOURCE\n'@)))." +
+                " Use UTF8_BASE64 only when the literal cannot represent the source. Submit one exact invocation; keep Cwd on the native tool. Do not broadly auto-approve this executable.");
         }
 
         private static int Pass(string agent)
@@ -161,9 +167,14 @@ namespace AgentExecution
             if (!Int32.TryParse(args[6], out seconds) || seconds < 1 || seconds > policy.MaximumTimeoutSeconds)
                 throw new ArgumentException("deadline outside policy");
             string command = DecodePayload(args[8]);
+            if (args[4] == "cmd" && HasNewline(command))
+            {
+                WinJob.WriteNotice("agent-exec: cmd_multiline_not_supported; use a single cmd line or a PowerShell script.\n", 192);
+                return 125;
+            }
             Request request = new Request { RunId = Guid.NewGuid().ToString("N"), Agent = "managed", Owner = args[2],
                 Command = command, Cwd = Environment.CurrentDirectory,
-                Heavy = IsHeavy(command) || args[2].StartsWith("heavy:", StringComparison.Ordinal) || args[2].StartsWith("background:heavy:", StringComparison.Ordinal),
+                Heavy = args[2].StartsWith("heavy:", StringComparison.Ordinal) || args[2].StartsWith("background:heavy:", StringComparison.Ordinal),
                 Background = args[2].StartsWith("background:", StringComparison.Ordinal),
                 TimeoutSeconds = seconds, CreatedUtcTicks = DateTime.UtcNow.Ticks };
             string id = RunStore.CreateRequest(policy, request);
@@ -232,8 +243,8 @@ namespace AgentExecution
             };
             try
             {
-                if (request.Heavy) heavy = Acquire("Heavy", policy.MaxConcurrentHeavyRuns, policy.QueueTimeoutSeconds);
-                slot = Acquire("Slot", policy.MaxConcurrentRuns, policy.QueueTimeoutSeconds);
+                if (request.Heavy) heavy = Acquire(policy, "Heavy", policy.MaxConcurrentHeavyRuns, policy.QueueTimeoutSeconds);
+                slot = Acquire(policy, "Slot", policy.MaxConcurrentRuns, policy.QueueTimeoutSeconds);
                 // Reserve the worst case for the complete owned pool. Concurrent admissions
                 // may read the same snapshot; all possible slots still fit behind this check.
                 RequireCommit((ulong)policy.MemoryMb * (ulong)policy.MaxConcurrentRuns * 1048576UL +
@@ -245,7 +256,8 @@ namespace AgentExecution
                 spec.MemoryBytes = (long)policy.MemoryMb * 1048576L;
                 spec.MaxProcesses = policy.MaxProcesses;
                 spec.TimeoutMilliseconds = checked(request.TimeoutSeconds * 1000);
-                spec.MaxOutputBytes = policy.MaxOutputBytes;
+                int noticeBudget = Math.Min(192, policy.MaxOutputBytes / 8);
+                spec.MaxOutputBytes = policy.MaxOutputBytes - noticeBudget;
                 spec.JobName = jobName;
                 spec.WatchParent = true;
                 spec.ForwardStdin = true;
@@ -261,13 +273,19 @@ namespace AgentExecution
                 receipt["peak_job_memory_bytes"] = result.PeakJobMemoryBytes;
                 receipt["active_processes_at_end"] = result.ActiveProcessesAtEnd;
                 receipt["status"] = result.CleanupConfirmed ? "finished" : "cleanup_unknown";
+                if (result.ExitCode != 0 || result.Reason != "exited" || !result.CleanupConfirmed)
+                    WinJob.WriteNotice("agent-exec: run " + request.RunId + " exit=" + result.ExitCode +
+                        " reason=" + result.Reason + " cleanup=" + (result.CleanupConfirmed ? "confirmed" : "unknown") + "\n", noticeBudget);
                 return result.CleanupConfirmed ? result.ExitCode : 125;
             }
             catch (Exception error)
             {
                 receipt["status"] = "rejected_or_failed";
                 receipt["error_type"] = error.GetType().Name;
-                Console.Error.WriteLine("agent-exec: run " + request.RunId + " failed (" + error.GetType().Name + ").");
+                string reason = error is TimeoutException ? "admission_queue_expired" :
+                    error is InvalidOperationException && error.Message == "insufficient commit reserve" ? "insufficient_commit_reserve" : "executor_failed";
+                receipt["reason"] = reason;
+                WinJob.WriteNotice("agent-exec: run " + request.RunId + " reason=" + reason + " error=" + error.GetType().Name + "\n", Math.Min(192, policy.MaxOutputBytes));
                 return 125;
             }
             finally
@@ -282,10 +300,10 @@ namespace AgentExecution
             }
         }
 
-        private static Mutex Acquire(string group, int count, int seconds)
+        private static Mutex Acquire(Policy policy, string group, int count, int seconds)
         {
-            Mutex[] choices = Enumerable.Range(0, count).Select(i => new Mutex(false,
-                "Global\\AgentExec-Admission-v1-" + group + "-" + i)).ToArray();
+            Mutex[] choices = Enumerable.Range(0, count).Select(i => SharedMutex.Open(
+                "Global\\AgentExec-Admission-v1-" + group + "-" + i, policy.StorageOwnerSid)).ToArray();
             int index;
             try { index = WaitHandle.WaitAny(choices, TimeSpan.FromSeconds(seconds)); }
             catch (AbandonedMutexException abandoned) { index = abandoned.MutexIndex; }
@@ -298,11 +316,8 @@ namespace AgentExecution
             return choices[index];
         }
 
-        private static bool IsHeavy(string command)
-        {
-            return Regex.IsMatch(command, @"(?im)^\s*#\s*agent-exec:\s*heavy\b") ||
-                Regex.IsMatch(command, @"(?i)\b(pytest|msbuild|cmake)\b|\b(dotnet|cargo|go)\s+(build|test)\b|\bnpm\s+(run\s+)?build\b");
-        }
+        private static bool HasNewline(string command)
+        { return command.IndexOf('\r') >= 0 || command.IndexOf('\n') >= 0; }
 
         internal static string UserKey()
         {
@@ -330,13 +345,20 @@ namespace AgentExecution
         private static void Help()
         { Console.WriteLine("Managed inline --owner TASK --shell powershell|cmd|bash --timeout SEC --command-base64 UTF8_BASE64; hook codex|agy; exec --owner TASK [--timeout SEC] [--heavy] -- ABSOLUTE_EXE ARGS; status; cancel ID; maintain. Policy: " + Path.Combine(Home, "policy.json")); }
 
-        [StructLayout(LayoutKind.Sequential)] private class MemoryStatus
+        [StructLayout(LayoutKind.Sequential)] private class PerformanceInfo
         {
-            public uint Length = (uint)Marshal.SizeOf(typeof(MemoryStatus)); public uint Load;
-            public ulong TotalPhysical, AvailablePhysical, TotalPageFile, AvailablePageFile, TotalVirtual, AvailableVirtual, AvailableExtendedVirtual;
+            public uint Size;
+            public UIntPtr CommitTotal, CommitLimit, CommitPeak, PhysicalTotal, PhysicalAvailable, SystemCache, KernelTotal, KernelPaged, KernelNonpaged, PageSize;
+            public uint HandleCount, ProcessCount, ThreadCount;
         }
-        [DllImport("kernel32.dll", SetLastError = true)] private static extern bool GlobalMemoryStatusEx([In, Out] MemoryStatus status);
+        [DllImport("psapi.dll", SetLastError = true)] private static extern bool GetPerformanceInfo([In, Out] PerformanceInfo info, uint size);
         private static void RequireCommit(ulong minimum)
-        { MemoryStatus status = new MemoryStatus(); if (!GlobalMemoryStatusEx(status) || status.AvailablePageFile < minimum) throw new InvalidOperationException("insufficient commit reserve"); }
+        {
+            var info = new PerformanceInfo();
+            info.Size = (uint)Marshal.SizeOf(typeof(PerformanceInfo));
+            if (!GetPerformanceInfo(info, info.Size) || info.CommitLimit.ToUInt64() < info.CommitTotal.ToUInt64() ||
+                checked((info.CommitLimit.ToUInt64() - info.CommitTotal.ToUInt64()) * info.PageSize.ToUInt64()) < minimum)
+                throw new InvalidOperationException("insufficient commit reserve");
+        }
     }
 }

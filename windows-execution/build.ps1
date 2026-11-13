@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([ValidatePattern('^agent-exec\.v[0-9]+\.exe$')][string]$Name='agent-exec.v1.exe')
+param([ValidatePattern('^agent-exec\.v[0-9]+\.exe$')][string]$Name='agent-exec.v3.exe')
 $ErrorActionPreference='Stop'
 $compiler=Join-Path $env:SystemRoot 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 if(-not(Test-Path -LiteralPath $compiler -PathType Leaf)){throw 'Required .NET Framework compiler is absent.'}

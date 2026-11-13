@@ -17,7 +17,7 @@
                     "period_hours":  24
                 },
     "execution":  {
-                      "binary_name":  "agent-exec.v1.exe",
+                      "binary_name":  "agent-exec.v3.exe",
                       "default_memory_mb":  2048,
                       "max_processes":  32,
                       "default_timeout_seconds":  600,

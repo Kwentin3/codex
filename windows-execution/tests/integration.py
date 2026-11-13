@@ -1,22 +1,43 @@
 """Small real native gate/managed-shell checks; no model or load calls."""
 import base64
+import argparse
 import json
 import os
 import pathlib
+import shutil
 import subprocess
 import tempfile
 import time
 
-HOME = pathlib.Path(__file__).resolve().parents[1]
-EXE = str(HOME / 'agent-exec.v1.exe')
+PACKAGE = pathlib.Path(__file__).resolve().parents[1]
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--binary', type=pathlib.Path, default=PACKAGE / 'agent-exec.v3.exe')
+args = parser.parse_args()
+assert args.binary.is_file(), 'Build the reviewed candidate before running integration checks'
+fixture_manager = tempfile.TemporaryDirectory(prefix='AgentExecIntegration-')
+HOME = pathlib.Path(fixture_manager.name) / 'package'
+HOME.mkdir()
+HOME = HOME.resolve()
+(HOME / 'tests').mkdir()
+EXE = str(HOME / args.binary.name)
+shutil.copyfile(args.binary, EXE)
 CODEX_GATE = EXE
-AGY_GATE = str(HOME / 'agent-exec.v2.exe')
+AGY_GATE = EXE
 AGY_PASS = {'decision': 'allow'}
 PORTABLE = EXE.replace('\\', '/')
 PS = r'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe'
 CWD = str(HOME)
 ENV = dict(os.environ, AGENT_EXEC_TEST='bounded-value')
 checks = []
+DATA = pathlib.Path(fixture_manager.name).resolve() / 'data'
+policy = json.loads((PACKAGE / 'policy.example.json').read_text(encoding='utf-8-sig'))
+sid = subprocess.run([PS, '-NoProfile', '-NonInteractive', '-Command',
+                      '[Security.Principal.WindowsIdentity]::GetCurrent().User.Value'],
+                     capture_output=True, check=True, timeout=10).stdout.decode('utf-8-sig').strip()
+policy['storage_owner_sid'] = sid
+policy['data_root'] = str(DATA)
+policy['execution']['binary_name'] = args.binary.name
+(HOME / 'policy.json').write_text(json.dumps(policy, ensure_ascii=False), encoding='utf-8')
 
 
 def invoke(argv, **kwargs):
@@ -46,7 +67,7 @@ def gate(command, agent='codex', ensure_ascii=False):
 
 def receipt(owner):
     matches = []
-    for p in pathlib.Path(r'D:\AgentExecutionDiagnostics\runtime\receipts').glob('*.jsonl'):
+    for p in (DATA / 'runtime' / 'receipts').glob('*.jsonl'):
         for line in p.open(encoding='utf-8-sig'):
             value = json.loads(line)
             if value.get('owner') == owner:
@@ -58,26 +79,31 @@ def receipt(owner):
 baseline_state = json.loads(invoke([EXE, 'status']).stdout)
 
 
-def check(label, source, expected_code=0, expected_text=None, shell='powershell'):
+def check(label, source, expected_code=0, expected_text=None, shell='powershell', allow_stderr=False):
     owner = 'integration:' + label
     command = command_line(source, owner, shell)
     assert gate(command) == {} and gate(command, 'agy') == AGY_PASS, label
     result = invoke([PS, '-NoLogo', '-NoProfile', '-NonInteractive', '-Command', command])
     # The native model submitted an executable invocation; Windows PowerShell's
-    # normal nonzero-native-exit normalization applies. Exact child code is retained.
+    # normal nonzero-native-exit normalization applies. Receipt stores the shell
+    # exit code, not an inferred code of an arbitrary earlier native statement.
     assert result.returncode == (0 if expected_code == 0 else 1), (label, result.returncode, result.stderr[:500])
     saved = receipt(owner)
     assert (saved['exit_code'] == expected_code and saved['cleanup_confirmed']
             and saved['active_processes_at_end'] == 0), (label, saved)
     if expected_text is not None:
         assert expected_text.encode() in result.stdout, (label, result.stdout, result.stderr[:500])
-    if expected_code == 0:
+    if expected_code == 0 and not allow_stderr:
         assert not result.stderr, (label, 'unexpected stderr', result.stderr[:500])
     checks.append(label)
+    return result, saved
 
 
 check('success', "Write-Output 'managed-integration'", expected_text='managed-integration')
 check('native-failure', '& $env:ComSpec /d /c exit 7', expected_code=1)
+check('native-explicit-propagation', '& $env:ComSpec /d /c exit 7; exit $LASTEXITCODE', expected_code=7)
+check('native-then-success', "& $env:ComSpec /d /c exit 7; Write-Output 'last-success'", expected_text='last-success')
+check('native-then-cmdlet-error', "& $env:ComSpec /d /c exit 7; Write-Error 'last-error'", expected_code=1)
 check('write-error', "Write-Error 'expected-failure'", expected_code=1)
 check('explicit-exit', 'exit 7', expected_code=7)
 check('using-directive', 'using namespace System.Text\n[StringBuilder]::new().GetType().Name', expected_text='StringBuilder')
@@ -87,6 +113,39 @@ check('environment', '$env:AGENT_EXEC_TEST', expected_text='bounded-value')
 check('large-source', '# ' + 'x' * 14000 + "\nWrite-Output 'large-tail'", expected_text='large-tail')
 check('cmd', 'echo cmd-parity', expected_text='cmd-parity', shell='cmd')
 check('bash', "printf 'bash-parity\\n'", expected_text='bash-parity', shell='bash')
+check('bash-multiline', "printf 'bash-first\\n'\nprintf 'bash-last\\n'", expected_text='bash-last', shell='bash')
+_, light = check('light-mentions-build', "Write-Output 'pytest cmake dotnet build'", expected_text='pytest')
+assert not light['heavy'], light
+
+for newline in ['\n', '\r', '\r\n']:
+    source = 'echo FIRST' + newline + 'echo MUST_NOT_RUN'
+    bad = command_line(source, 'integration:cmd-multiline', shell='cmd')
+    assert gate(bad)['hookSpecificOutput']['permissionDecision'] == 'deny'
+    assert gate(bad, 'agy')['decision'] == 'deny'
+    result = invoke([EXE, 'inline', '--owner', 'integration:cmd-multiline', '--shell', 'cmd',
+                     '--timeout', '10', '--command-base64', base64.b64encode(source.encode()).decode()])
+    assert result.returncode == 125 and not result.stdout and b'cmd_multiline_not_supported' in result.stderr
+checks.append('cmd-multiline-rejected-before-execution')
+
+result, clipped = check('bounded-output-tail',
+                        "[Console]::Write(('H' * 90000) + 'OUTPUT-TAIL-KEPT')",
+                        expected_text='OUTPUT-TAIL-KEPT', allow_stderr=True)
+assert clipped['output_clipped'] and b'clipped' in result.stderr.lower()
+assert len(result.stdout) + len(result.stderr) <= policy['execution']['max_output_bytes']
+checks.append('output-marker-tail-within-total-budget')
+
+direct = invoke([EXE, 'exec', '--owner', 'integration:direct-native', '--timeout', '10', '--',
+                 os.environ['ComSpec'], '/d', '/c', 'exit', '7'])
+saved_direct = receipt('integration:direct-native')
+assert direct.returncode == 7 and saved_direct['exit_code'] == 7 and saved_direct['cleanup_confirmed']
+assert b'reason=exited' in direct.stderr and b'exit=7' in direct.stderr
+checks.append('direct-native-code-and-brief-result')
+
+command = command_line("Write-Output 'tiny-heavy-control'", 'heavy:integration-explicit')
+assert gate(command) == {} and gate(command, 'agy') == AGY_PASS
+result = invoke([PS, '-NoProfile', '-NonInteractive', '-Command', command])
+assert result.returncode == 0 and receipt('heavy:integration-explicit')['heavy']
+checks.append('explicit-heavy-owner')
 
 canonical = command_line("Write-Output 'safe'", 'integration:gate')
 for bad in ['Write-Output unsafe', canonical + '; echo escape', canonical + ' & echo escape',
@@ -96,14 +155,14 @@ for bad in ['Write-Output unsafe', canonical + '; echo escape', canonical + ' & 
     assert gate(bad, 'agy')['decision'] == 'deny', bad[:80]
 checks.append('native-gates-deny-raw-compound-oversized')
 
-# v2 is the AGY hook adapter; policy still selects v1 for actual execution.
-assert json.loads((HOME / 'policy.json').read_text(encoding='utf-8-sig'))['execution']['binary_name'] == 'agent-exec.v1.exe'
+# One reviewed binary owns execution and both protocol adapters.
+assert json.loads((HOME / 'policy.json').read_text(encoding='utf-8-sig'))['execution']['binary_name'] == args.binary.name
 assert gate(canonical, 'agy', ensure_ascii=False) == AGY_PASS
 assert gate(canonical, 'agy', ensure_ascii=True) == AGY_PASS
-wrong_target = canonical.replace(PORTABLE, AGY_GATE.replace('\\', '/'), 1)
+wrong_target = canonical.replace(PORTABLE, str(HOME / 'agent-exec.v0.exe').replace('\\', '/'), 1)
 assert gate(wrong_target, 'agy')['decision'] == 'deny'
 assert gate(wrong_target)['hookSpecificOutput']['permissionDecision'] == 'deny'
-checks.append('agy-v2-canonical-v1-target-and-utf8')
+checks.append('one-binary-canonical-target-and-utf8')
 
 for suffix in ['status', 'maintain', 'cancel ' + 'a' * 32]:
     assert gate(PORTABLE + ' ' + suffix) == {}
@@ -186,3 +245,5 @@ assert not any(str(item.get('Owner', item.get('owner', ''))).startswith('integra
 print(json.dumps({'status': 'PASS', 'execution_binary': EXE, 'codex_gate': CODEX_GATE,
                   'agy_gate': AGY_GATE, 'checks': checks, 'count': len(checks),
                   'pending_at_end': state['pending'], 'runtime_bytes': state['runtime_bytes']}, ensure_ascii=False))
+fixture_manager.cleanup()
+assert not HOME.parent.exists(), 'Integration fixture was not removed'

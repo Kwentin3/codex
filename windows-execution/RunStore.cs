@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Security.AccessControl;
 using System.Security.Cryptography;
 using System.Security.Principal;
 using System.Text;
@@ -14,8 +15,10 @@ namespace AgentExecution
 {
     public sealed class Policy
     {
+        internal const long MaximumRuntimeBytes = 32L * 1024 * 1024;
         public string DataRoot { get; private set; }
         public string BinaryName { get; private set; }
+        public string StorageOwnerSid { get; private set; }
         public int MemoryMb { get; private set; }
         public int MaxProcesses { get; private set; }
         public int TimeoutSeconds { get; private set; }
@@ -38,6 +41,10 @@ namespace AgentExecution
             if (root == null || Number(root, "schema_version", 1, 1) != 1) throw new InvalidDataException("Unsupported policy schema.");
             var retention = Section(root, "retention");
             var execution = Section(root, "execution");
+            object storageOwner;
+            if (!root.TryGetValue("storage_owner_sid", out storageOwner) || !(storageOwner is string))
+                throw new InvalidDataException("Explicit storage_owner_sid is required.");
+            string ownerSid = ParseStorageOwnerSid((string)storageOwner).Value;
             object binaryName;
             if (!execution.TryGetValue("binary_name", out binaryName) || !(binaryName is string) ||
                 !System.Text.RegularExpressions.Regex.IsMatch((string)binaryName, @"\Aagent-exec\.v[0-9]+\.exe\z"))
@@ -45,22 +52,15 @@ namespace AgentExecution
             long total = Number(retention, "total_bytes", 1, 512L * 1024 * 1024);
             long active = Number(retention, "active_reserved_bytes", 1, total);
             long closed = Number(retention, "closed_max_bytes", 1, total);
-            long runtime = Number(retention, "runtime_max_bytes", 1, 32L * 1024 * 1024);
+            long runtime = Number(retention, "runtime_max_bytes", 1, MaximumRuntimeBytes);
             long margin = Number(retention, "margin_bytes", 1, total);
             if (active + closed + runtime + margin > total) throw new InvalidDataException("Policy partitions exceed total budget.");
             Number(retention, "incident_days", 1, 30);
             object dataRoot;
             if (!root.TryGetValue("data_root", out dataRoot) || !(dataRoot is string)) throw new InvalidDataException("Missing data_root.");
-            string dataPath = (string)dataRoot;
-            if (String.IsNullOrWhiteSpace(dataPath) || !Path.IsPathRooted(dataPath) || dataPath.StartsWith("\\", StringComparison.Ordinal) ||
-                !Path.GetPathRoot(dataPath).EndsWith("\\", StringComparison.Ordinal))
-                throw new InvalidDataException("data_root must be a local absolute directory.");
-            dataPath = Path.GetFullPath(dataPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            if (dataPath.Length <= 3 || String.Equals(dataPath, Path.GetPathRoot(dataPath).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
-                throw new InvalidDataException("data_root cannot be a volume root.");
-            RunStore.CheckPath(dataPath, true);
+            string dataPath = NormalizeDataRoot((string)dataRoot);
             var policy = new Policy {
-                DataRoot = dataPath, BinaryName = (string)binaryName, RuntimeMaxBytes = runtime,
+                DataRoot = dataPath, BinaryName = (string)binaryName, StorageOwnerSid = ownerSid, RuntimeMaxBytes = runtime,
                 OrdinaryDays = (int)Number(retention, "ordinary_days", 1, 7),
                 MemoryMb = (int)Number(execution, "default_memory_mb", 1, 1048576),
                 MaxProcesses = (int)Number(execution, "max_processes", 1, 1024),
@@ -75,6 +75,27 @@ namespace AgentExecution
             if (policy.TimeoutSeconds > policy.MaximumTimeoutSeconds || policy.MaxConcurrentHeavyRuns > policy.MaxConcurrentRuns)
                 throw new InvalidDataException("Inconsistent execution bounds.");
             return policy;
+        }
+
+        internal static string NormalizeDataRoot(string dataPath)
+        {
+            if (String.IsNullOrWhiteSpace(dataPath) || !Path.IsPathRooted(dataPath) || dataPath.StartsWith("\\", StringComparison.Ordinal) ||
+                !Path.GetPathRoot(dataPath).EndsWith("\\", StringComparison.Ordinal))
+                throw new InvalidDataException("data_root must be a local absolute directory.");
+            dataPath = Path.GetFullPath(dataPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (dataPath.Length <= 3 || String.Equals(dataPath, Path.GetPathRoot(dataPath).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase))
+                throw new InvalidDataException("data_root cannot be a volume root.");
+            RunStore.CheckPath(dataPath, true);
+            return dataPath;
+        }
+
+        internal static SecurityIdentifier ParseStorageOwnerSid(string value)
+        {
+            SecurityIdentifier sid;
+            try { sid = new SecurityIdentifier(value); }
+            catch (ArgumentException) { throw new InvalidDataException("Invalid native storage_owner_sid."); }
+            if (sid.Value != value) throw new InvalidDataException("storage_owner_sid must be canonical.");
+            return sid;
         }
 
         private static Dictionary<string, object> Section(Dictionary<string, object> root, string key)
@@ -109,10 +130,31 @@ namespace AgentExecution
         public long OwnerStartUtcTicks, StartedUtcTicks;
     }
 
+    // One native security contract for Store, admission and telemetry mutexes.
+    // Existing objects are opened without changing their ownership or ACL.
+    public static class SharedMutex
+    {
+        public static Mutex Open(string name, string ownerSid)
+        {
+            if (name == null || !System.Text.RegularExpressions.Regex.IsMatch(name, @"\AGlobal\\AgentExec[A-Za-z0-9_-]{0,160}\z"))
+                throw new ArgumentException("Mutex must belong to the bounded AgentExec namespace.", "name");
+            SecurityIdentifier owner = Policy.ParseStorageOwnerSid(ownerSid);
+            var security = new MutexSecurity();
+            security.SetAccessRuleProtection(true, false);
+            foreach (string sid in new[] { "S-1-5-18", "S-1-5-32-544", owner.Value }.Distinct(StringComparer.Ordinal))
+                security.AddAccessRule(new MutexAccessRule(new SecurityIdentifier(sid), MutexRights.FullControl, AccessControlType.Allow));
+            bool created;
+            return new Mutex(false, name, out created, security);
+        }
+    }
+
     public static class RunStore
     {
         private const int RequestLimit = 65536, ActiveLimit = 4096, RecordLimit = 8192;
         private const int ReceiptFileLimit = 512 * 1024, ReceiptFiles = 8, PendingLimit = 32, ActiveFiles = 32;
+        // Three request artifacts per pending ID, active records, receipt ring,
+        // one atomic-write temp, plus one pending batch for bounded recovery.
+        private const int InventoryLimit = PendingLimit * 3 + ActiveFiles + ReceiptFiles + 1 + PendingLimit;
         private static readonly Encoding Utf8 = new UTF8Encoding(false, true);
         private static readonly string MutexName = BuildMutexName();
         private static readonly HashSet<string> ReceiptKeys = new HashSet<string>(new[] {
@@ -133,9 +175,10 @@ namespace AgentExecution
         {
             private readonly Mutex mutex;
             private bool held;
-            public Gate()
+            public Gate(Policy policy) : this(StoreOwner(policy)) { }
+            public Gate(string ownerSid)
             {
-                mutex = new Mutex(false, MutexName);
+                mutex = SharedMutex.Open(MutexName, ownerSid);
                 try { held = mutex.WaitOne(TimeSpan.FromSeconds(10)); }
                 catch (AbandonedMutexException) { held = true; }
                 if (!held) { mutex.Dispose(); throw new IOException("Runtime store is busy."); }
@@ -146,11 +189,9 @@ namespace AgentExecution
         public static string CreateRequest(Policy policy, Request request)
         {
             if (request == null) throw new ArgumentNullException("request");
-            using (new Gate())
+            using (new Gate(policy))
             {
-                Layout layout = Prepare(policy);
-                MaintainLocked(policy, layout);
-                layout = Inspect(policy);
+                Layout layout = Prepare(policy, true);
                 if (PendingIds(layout).Count >= PendingLimit) throw new IOException("Pending request quota reached.");
                 request.RunId = Guid.NewGuid().ToString("N");
                 request.CreatedUtcTicks = DateTime.UtcNow.Ticks;
@@ -164,7 +205,7 @@ namespace AgentExecution
         public static Request ClaimRequest(Policy policy, string id)
         {
             ValidateId(id);
-            using (new Gate())
+            using (new Gate(policy))
             {
                 Layout layout = Prepare(policy);
                 string file = Path.Combine(layout.Requests, id + ".json");
@@ -184,7 +225,7 @@ namespace AgentExecution
         public static void SetActive(Policy policy, ActiveRun run)
         {
             ValidateActive(run);
-            using (new Gate())
+            using (new Gate(policy))
             {
                 Layout layout = Prepare(policy);
                 if (!File.Exists(Path.Combine(layout.Requests, run.RunId + ".claimed"))) throw new IOException("Active run requires a claimed request.");
@@ -204,7 +245,7 @@ namespace AgentExecution
             byte[] bytes = new byte[text.Length + 3];
             bytes[0] = 0xef; bytes[1] = 0xbb; bytes[2] = 0xbf;
             Buffer.BlockCopy(text, 0, bytes, 3, text.Length);
-            using (new Gate())
+            using (new Gate(policy))
             {
                 Layout layout = Prepare(policy);
                 Claim claim = Read<Claim>(Path.Combine(layout.Requests, runId + ".claimed"), 1024);
@@ -231,7 +272,7 @@ namespace AgentExecution
             clean["completed_utc_ticks"] = DateTime.UtcNow.Ticks;
             byte[] record = Utf8.GetBytes(Json().Serialize(clean) + "\n");
             if (record.Length > RecordLimit) throw new InvalidDataException("Receipt record exceeds 8 KiB.");
-            using (new Gate())
+            using (new Gate(policy))
             {
                 Layout layout = Prepare(policy);
                 string active = Path.Combine(layout.Active, id + ".json");
@@ -259,7 +300,7 @@ namespace AgentExecution
         public static void RequestCancel(Policy policy, string id)
         {
             ValidateId(id);
-            using (new Gate())
+            using (new Gate(policy))
             {
                 Layout layout = Prepare(policy);
                 if (!PendingIds(layout).Contains(id) && !File.Exists(Path.Combine(layout.Active, id + ".json")))
@@ -273,17 +314,30 @@ namespace AgentExecution
 
         public static bool IsCancelled(Policy policy, string id)
         {
+            if (policy == null) throw new ArgumentNullException("policy");
             ValidateId(id);
-            using (new Gate())
+            string runtime = Path.Combine(policy.DataRoot, "runtime");
+            string active = Path.Combine(runtime, "active");
+            string path = Path.Combine(active, id + ".cancel");
+            CheckPath(policy.DataRoot, true);
+            CheckPath(runtime, true);
+            CheckPath(active, true);
+            CheckPath(path, false);
+            try
             {
-                Layout layout = Prepare(policy);
-                return File.Exists(Path.Combine(layout.Active, id + ".cancel"));
+                FileAttributes attributes = File.GetAttributes(path);
+                if ((attributes & (FileAttributes.Directory | FileAttributes.ReparsePoint)) != 0)
+                    throw new InvalidDataException("Invalid cancellation marker path.");
+                if (new FileInfo(path).Length != 0) throw new InvalidDataException("Cancellation marker must be empty.");
+                return true;
             }
+            catch (FileNotFoundException) { return false; }
+            catch (DirectoryNotFoundException) { return false; }
         }
 
         public static object Status(Policy policy)
         {
-            using (new Gate())
+            using (new Gate(policy))
             {
                 Layout layout = Prepare(policy);
                 var active = new List<ActiveRun>();
@@ -301,44 +355,80 @@ namespace AgentExecution
 
         public static void Maintain(Policy policy)
         {
-            using (new Gate()) { Layout layout = Prepare(policy); MaintainLocked(policy, layout); }
+            using (new Gate(policy)) { Prepare(policy, true); }
         }
 
-        private static Layout Prepare(Policy policy)
+        // Physical storage admission for the telemetry owner. This does not
+        // create directories, parse records or recover state. Logical pressure
+        // is reported separately; only Prepare/Maintain may repair that state.
+        // A caller already holding the same Store mutex may call synchronously.
+        public static object InspectStorage(string dataRoot, long runtimeMaxBytes, string storageOwnerSid)
+        {
+            if (runtimeMaxBytes < 1 || runtimeMaxBytes > Policy.MaximumRuntimeBytes)
+                throw new ArgumentOutOfRangeException("runtimeMaxBytes");
+            dataRoot = Policy.NormalizeDataRoot(dataRoot);
+            using (new Gate(storageOwnerSid))
+            {
+                Layout layout = Inspect(dataRoot, runtimeMaxBytes, false);
+                if (layout.Bytes > runtimeMaxBytes) throw new IOException("Runtime byte budget exceeded; no files removed.");
+                return new {
+                    runtime_bytes = layout.Bytes, file_count = layout.Files.Count,
+                    pending = PendingIds(layout).Count,
+                    active_files = FilesIn(layout, layout.Active).Count(f => !IsTemp(f.Name)),
+                    receipt_files = FilesIn(layout, layout.Receipts).Count(f => !IsTemp(f.Name)),
+                    temp_files = layout.Files.Count(f => IsTemp(f.Name)),
+                    logical_quota_valid = !QuotasExceeded(layout, runtimeMaxBytes)
+                };
+            }
+        }
+
+        private static Layout Prepare(Policy policy, bool maintainExpired = false)
         {
             if (policy == null) throw new ArgumentNullException("policy");
             EnsureDirectory(policy.DataRoot);
             string root = Path.Combine(policy.DataRoot, "runtime");
             EnsureDirectory(root);
             foreach (string name in new[] { "requests", "active", "receipts" }) EnsureDirectory(Path.Combine(root, name));
-            Layout layout = Inspect(policy);
+            // Validate every name, path and per-file bound before deleting any
+            // recognized orphan. Writers hold this same gate, so an observed
+            // atomic-write temp cannot belong to a write still in progress.
+            Layout layout = Inspect(policy, false);
             foreach (FileInfo file in layout.Files.Where(f => IsTemp(f.Name))) SafeDelete(file.FullName);
+            layout = Inspect(policy, false);
+            if (maintainExpired || QuotasExceeded(layout, policy.RuntimeMaxBytes)) MaintainLocked(policy, layout);
             return Inspect(policy);
         }
 
         private static Layout Inspect(Policy policy)
+        { return Inspect(policy, true); }
+
+        private static Layout Inspect(Policy policy, bool enforceQuotas)
+        { return Inspect(policy.DataRoot, policy.RuntimeMaxBytes, enforceQuotas); }
+
+        private static Layout Inspect(string dataRoot, long runtimeMaxBytes, bool enforceQuotas)
         {
-            string root = Path.Combine(policy.DataRoot, "runtime");
+            string root = Path.Combine(dataRoot, "runtime");
             var layout = new Layout { Root = root, Requests = Path.Combine(root, "requests"), Active = Path.Combine(root, "active"),
                 Receipts = Path.Combine(root, "receipts"), Files = new List<FileInfo>() };
             CheckPath(root, true);
             var directories = new HashSet<string>(new[] { "requests", "active", "receipts" }, StringComparer.Ordinal);
-            foreach (string entry in Directory.GetFileSystemEntries(root))
+            foreach (string entry in DirectoryPresent(root) ? Directory.EnumerateFileSystemEntries(root) : Enumerable.Empty<string>())
             {
                 CheckPath(entry, Directory.Exists(entry));
                 if (!Directory.Exists(entry) || !directories.Contains(Path.GetFileName(entry))) throw new InvalidDataException("Unknown runtime entry; preserved.");
             }
-            int tempCount = 0;
             foreach (string dir in new[] { layout.Requests, layout.Active, layout.Receipts })
             {
                 CheckPath(dir, true);
-                foreach (string path in Directory.GetFileSystemEntries(dir))
+                if (!DirectoryPresent(dir)) continue;
+                foreach (string path in Directory.EnumerateFileSystemEntries(dir))
                 {
+                    if (layout.Files.Count >= InventoryLimit) throw new IOException("Runtime inventory exceeds bounded recovery capacity; no files removed.");
                     CheckPath(path, false);
                     if (Directory.Exists(path)) throw new InvalidDataException("Unexpected runtime subdirectory; preserved.");
                     var file = new FileInfo(path);
                     long maximum;
-                    if (IsTemp(file.Name)) { maximum = ReceiptFileLimit; tempCount++; }
+                    if (IsTemp(file.Name)) maximum = ReceiptFileLimit;
                     else if (dir == layout.Receipts) { ReceiptDate(file.Name); maximum = ReceiptFileLimit; }
                     else
                     {
@@ -355,10 +445,35 @@ namespace AgentExecution
                     layout.Files.Add(file);
                 }
             }
-            if (tempCount > 1 || PendingIds(layout).Count > PendingLimit || FilesIn(layout, layout.Active).Count(f => !IsTemp(f.Name)) > ActiveFiles ||
-                FilesIn(layout, layout.Receipts).Count(f => !IsTemp(f.Name)) > ReceiptFiles || layout.Bytes > policy.RuntimeMaxBytes)
+            if (enforceQuotas && QuotasExceeded(layout, runtimeMaxBytes))
                 throw new IOException("Runtime quota exceeded; no files removed.");
             return layout;
+        }
+
+        private static bool QuotasExceeded(Layout layout, long runtimeMaxBytes)
+        {
+            return layout.Files.Count(f => IsTemp(f.Name)) > 1 || PendingIds(layout).Count > PendingLimit ||
+                FilesIn(layout, layout.Active).Count(f => !IsTemp(f.Name)) > ActiveFiles ||
+                FilesIn(layout, layout.Receipts).Count(f => !IsTemp(f.Name)) > ReceiptFiles || layout.Bytes > runtimeMaxBytes;
+        }
+
+        private static string StoreOwner(Policy policy)
+        {
+            if (policy == null) throw new ArgumentNullException("policy");
+            return policy.StorageOwnerSid;
+        }
+
+        private static bool DirectoryPresent(string path)
+        {
+            try
+            {
+                FileAttributes attributes = File.GetAttributes(path);
+                if ((attributes & FileAttributes.Directory) == 0 || (attributes & FileAttributes.ReparsePoint) != 0)
+                    throw new InvalidDataException("Invalid runtime directory path.");
+                return true;
+            }
+            catch (FileNotFoundException) { return false; }
+            catch (DirectoryNotFoundException) { return false; }
         }
 
         private static void MaintainLocked(Policy policy, Layout layout)

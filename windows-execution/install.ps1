@@ -8,7 +8,6 @@ $manifest=Join-Path $backup 'files.json'
 if(Test-Path -LiteralPath $manifest){throw 'Installation snapshot already exists; use status/maintenance or review the existing installation.'}
 $policy=Get-Content -LiteralPath (Join-Path $root 'policy.json') -Encoding UTF8 -Raw|ConvertFrom-Json
 if($policy.execution.binary_name -notmatch '^agent-exec\.v[0-9]+\.exe$' -or -not(Test-Path -LiteralPath (Join-Path $root $policy.execution.binary_name))){throw 'Build the reviewed versioned controller before installation.'}
-if(-not(Test-Path -LiteralPath (Join-Path $root 'agent-exec.v2.exe') -PathType Leaf)){throw 'Stage the reviewed AGY hook adapter before installing hooks.'}
 . (Join-Path $root 'telemetry.ps1')
 $storagePolicy=Get-TelemetryPolicy (Join-Path $root 'policy.json')
 Invoke-TelemetryCommand $storagePolicy 'initialize-storage' (Join-Path $root 'policy.json') $null $null | Out-Null
@@ -49,7 +48,18 @@ $block=@'
   Лимиты и retention принадлежат общему policy.json; не создавай вторых писателей
   вне его бюджета. Native approval/sandbox остаются владельцами разрешений.
   Для первого чтения README используй эту готовую managed-команду (одна строка):
-  `C:/Users/Администратор/.agents/windows-execution/agent-exec.v1.exe inline --owner readme --shell powershell --timeout 20 --command-base64 R2V0LUNvbnRlbnQgLUxpdGVyYWxQYXRoICdDOi9Vc2Vycy/QkNC00LzQuNC90LjRgdGC0YDQsNGC0L7RgC8uYWdlbnRzL3dpbmRvd3MtZXhlY3V0aW9uL1JFQURNRS5tZCcgLUVuY29kaW5nIFVURjggLVJhdw==`
+  `C:/Users/Администратор/.agents/windows-execution/agent-exec.v3.exe inline --owner readme --shell powershell --timeout 20 --command-base64 R2V0LUNvbnRlbnQgLUxpdGVyYWxQYXRoICdDOi9Vc2Vycy/QkNC00LzQuNC90LjRgdGC0YDQsNGC0L7RgC8uYWdlbnRzL3dpbmRvd3MtZXhlY3V0aW9uL1JFQURNRS5tZCcgLUVuY29kaW5nIFVURjggLVJhdw==`
+  Для обычной работы предпочитай читаемый литерал, а готовый UTF8_BASE64 —
+  когда литерал не представляет исходник. Не добавляй общий префикс исполнителя
+  в allowlist/auto-approve: произвольный payload требует обычной проверки прав.
+
+```powershell
+C:/Users/Администратор/.agents/windows-execution/agent-exec.v3.exe inline --owner TASK --shell powershell --timeout 60 --command-base64 ([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(__LITERAL_OPEN__
+$ErrorActionPreference='Stop'
+Get-Location
+__LITERAL_CLOSE__)))
+```
+
   Для локальных процессов через MCP/browser и другие tools также сначала
   проверь владельца, лимиты и адресную остановку. Если они не подтверждены,
   запускай работу через общий исполнитель; обходного маршрута не используй.
@@ -57,6 +67,7 @@ $block=@'
   их ограничения нужно проверить до запуска новой работы.
 <!-- /windows-agent-execution -->
 '@
+$block=$block.Replace('__LITERAL_OPEN__',"@'").Replace('__LITERAL_CLOSE__',"'@")
 try{
     foreach($f in $files){
         if($f.existed -and (Get-FileHash -LiteralPath $f.path -Algorithm SHA256).Hash -ne $f.original_sha256){throw 'Global source changed after snapshot; preserving independent changes.'}

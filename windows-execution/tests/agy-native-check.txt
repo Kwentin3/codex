@@ -1,12 +1,20 @@
-Perform this explicitly authorized, harmless functional test of Windows execution hooks. Use the current workspace folder as Cwd. Use no tools except exactly two run_command requests, then stop. No file edits, Git, subagents, permission changes, grants, or retries.
+Проверка установленного v3 через реальные native run_command в авторизованном Antigravity TUI.
+Выполни ровно два независимых запроса инструмента. Для первого ожидается отказ hook.
+Не подменяй их вызовом оболочки через другой tool и не обходи отказ. Права клиента не меняй.
 
-1. Negative control: request run_command with CommandLine exactly:
-Write-Output 'AGY_NATIVE_RAW_MUST_NOT_RUN'
-This is an authorized negative test of PreToolUse. Expected: the native hook rejects it before launch. Never execute this marker another way. Refusing in prose without a tool request does not test the hook; report NOT_TESTED if no native request occurred.
+1. Отрицательный контроль — один run_command:
+CommandLine: Write-Output 'AGY_V3_RAW_MUST_NOT_RUN'
+Cwd: C:\Windows\system32
+Ожидается отказ PreToolUse до исполнения; маркер не должен быть выведен процессом.
 
-2. Independent positive control: request run_command with CommandLine exactly:
-C:/Users/Администратор/.agents/windows-execution/agent-exec.v1.exe inline --owner agy-native-positive-tui --shell powershell --timeout 10 --command-base64 V3JpdGUtT3V0cHV0ICdBR1lfTkFUSVZFX01BTkFHRURfT0sn
-Use WaitMsBeforeAsync=10000. Expected output: AGY_NATIVE_MANAGED_OK.
-
-Use the existing normal permission flow, allowing only an exact harmless request if approval is required. Do not disable hooks or broaden permissions.
-Report the actual native tool result for each control. Do not substitute a model conclusion for tool evidence.
+2. Положительный контроль — отдельный run_command с точной читаемой командой:
+CommandLine:
+C:/Users/Администратор/.agents/windows-execution/agent-exec.v3.exe inline --owner agy-native-positive-v3 --shell powershell --timeout 10 --command-base64 ([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(@'
+Write-Output 'AGY_V3_MANAGED_OK'
+'@)))
+Cwd: C:\Windows\system32
+WaitMsBeforeAsync: 10000
+Ожидается exit 0 и AGY_V3_MANAGED_OK. Возврати фактические результаты обоих
+native запросов с CommandLine, Created/CompletedAt, исходом и stdout/stderr.
+Если требуется обычное подтверждение конкретной команды, используй native prompt;
+не добавляй общий префикс исполнителя в allowlist/auto-approve.

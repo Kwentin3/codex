@@ -1,26 +1,44 @@
 {
-    "schema_version":  1,
-    "accepted_date":  "2026-11-13",
-    "platform":  "Windows Server 2019 x64; Windows PowerShell 5.1; .NET Framework compiler",
-    "purpose":  "Source snapshot of the accepted local installation; source files below are byte-exact. Private diagnostics/configuration and executable binaries excluded.",
-    "accepted_binaries":  [
-                              {
-                                  "name":  "agent-exec.v1.exe",
-                                  "sha256":  "6E02570190096146FB44578883B8207C96AA72581E61A9EDCB6E552253ED0194",
-                                  "role":  "Managed execution and Codex hook",
-                                  "source_directory":  "source-v1"
-                              },
-                              {
-                                  "name":  "agent-exec.v2.exe",
-                                  "sha256":  "8803B7B7EDFEEBAC9EA669F2C1B30D864FE061A23033C810BCEF5FBD555C3AF5",
-                                  "role":  "Antigravity hook; canonical managed execution remains v1",
-                                  "source_directory":  "."
-                              }
-                          ],
+    "schema_version":  2,
+    "checked_utc":  "2026-11-13T20:45:52.5145990Z",
+    "stage":  "source-validated; installation and native client acceptance pending",
+    "platform":  "Windows Server 2019 x64 / PowerShell 5.1 / .NET Framework C#5",
+    "historical_baseline":  {
+                                "commit":  "689ca8157afb63e1f680aa179084e5ac29dec521",
+                                "binaries":  [
+                                                 {
+                                                     "name":  "agent-exec.v1.exe",
+                                                     "sha256":  "6E02570190096146FB44578883B8207C96AA72581E61A9EDCB6E552253ED0194",
+                                                     "role":  "Managed execution and Codex hook",
+                                                     "source_directory":  "source-v1"
+                                                 },
+                                                 {
+                                                     "name":  "agent-exec.v2.exe",
+                                                     "sha256":  "8803B7B7EDFEEBAC9EA669F2C1B30D864FE061A23033C810BCEF5FBD555C3AF5",
+                                                     "role":  "Antigravity hook; canonical managed execution remains v1",
+                                                     "source_directory":  "."
+                                                 }
+                                             ]
+                            },
+    "candidate":  {
+                      "name":  "agent-exec.v3.exe",
+                      "sha256":  "6C2C43DE129F6675D2C02102D921F25ED36D0C12EF99A7A7D1978A8E67AAD9A9",
+                      "bytes":  76288,
+                      "roles":  [
+                                    "managed execution",
+                                    "Codex hook",
+                                    "Antigravity hook"
+                                ],
+                      "source_files":  [
+                                           "AgentExec.cs",
+                                           "ShellCommand.cs",
+                                           "RunStore.cs",
+                                           "WinJob.cs"
+                                       ]
+                  },
     "build":  {
                   "compiler":  "Framework64/v4.0.30319/csc.exe",
-                  "observed_compiler_sha256":  "4240A12E0B246C9D69AF1F697488FE7DA1B497DF20F4A6F95135B4D5FE180A57",
-                  "v1_historical_compiler_hash_verified":  false,
+                  "sha256":  "4240A12E0B246C9D69AF1F697488FE7DA1B497DF20F4A6F95135B4D5FE180A57",
                   "arguments":  [
                                     "/nologo",
                                     "/langversion:5",
@@ -31,43 +49,44 @@
                                     "/r:System.Web.Extensions.dll",
                                     "/r:System.Management.dll"
                                 ],
-                  "deterministic_binary_rebuild_proven":  false
+                  "output":  ".local/candidate-v3/agent-exec.v3.exe",
+                  "binary_recompiled_after_acceptance":  false
               },
     "files":  [
                   {
                       "path":  "AgentExec.cs",
-                      "bytes":  20407,
-                      "sha256":  "D9E905F8D470F2844ABCE8B46EC1287EF7839A7644D0EB893B4A46A23D2DE6DF"
+                      "bytes":  22063,
+                      "sha256":  "7426B8197805C748DD670D69B4A6A3A2726C56B784F180BAB9AD3023C70C1D91"
                   },
                   {
                       "path":  "ShellCommand.cs",
-                      "bytes":  6364,
-                      "sha256":  "8256E3F78511AE1251B620BCC90730476220FABAF6D9043365026AD92750AB6D"
+                      "bytes":  6566,
+                      "sha256":  "FB830546386AB6B70F40468C30CB78587D678C2B6447B7BBADBC679E5922EC00"
                   },
                   {
                       "path":  "RunStore.cs",
-                      "bytes":  31997,
-                      "sha256":  "9578D254FF12BFFFFF280CF30328CA6DD8037B91C91F71DE51DC645E613817E8"
+                      "bytes":  38630,
+                      "sha256":  "99AB91276EC4218585842586D2FFA5B308F7E057BBE4E7A1B664DF6BA7BD3F91"
                   },
                   {
                       "path":  "WinJob.cs",
-                      "bytes":  37132,
-                      "sha256":  "874675BAD356E7B46BF18B9865F6505A509455DF6409ACBC7250611D447E809B"
+                      "bytes":  46510,
+                      "sha256":  "40476A66BEFE6FB8865316818CC799E1FC82194B2DE6AB73EF71C2F04FDDD799"
                   },
                   {
                       "path":  "build.ps1",
                       "bytes":  892,
-                      "sha256":  "40089862663C670CA39A4F35FC59567A5CAF69658469EA0E8683EEC812FC4594"
+                      "sha256":  "1DC54A4ADEED3B323FE1744358B7AC31C9E3F2370484C1141E8D44D4781B1CD9"
                   },
                   {
                       "path":  "telemetry.ps1",
-                      "bytes":  46569,
-                      "sha256":  "7CF6744A2880B624B6C57B66675431FDCE1550B124FBCEC2AD22D4583BEF22A1"
+                      "bytes":  49486,
+                      "sha256":  "69EDE633F6A15F9462680891A81D5C05CB3790A5D2C31FD71F7ECACEA33823C4"
                   },
                   {
                       "path":  "install.ps1",
-                      "bytes":  6489,
-                      "sha256":  "C63E3FBC9889A398F4BF7D9E7899DA6C9AAA106F7D0DF08BF050048B4D37CB5C"
+                      "bytes":  7113,
+                      "sha256":  "D7FC224B526AA219A0CC7A8DBA5C1EF495FBD52C099981B9605F7335454A3724"
                   },
                   {
                       "path":  "rollback.ps1",
@@ -77,12 +96,22 @@
                   {
                       "path":  "hooks.codex.json",
                       "bytes":  518,
-                      "sha256":  "66DD6ADBDB89FEE431159F6B3B095FFAE1F02019239C01B18190CB7A80491905"
+                      "sha256":  "EC873E2A91428DCB74EF21C6E4676CECDC8F2D08D1F03C6003A1EAE50DB8A5C3"
                   },
                   {
                       "path":  "hooks.agy.json",
                       "bytes":  300,
-                      "sha256":  "181C9693AF3C8B8E6C2FFA67D63CE0E22BFF40B13F4E48C054BD3EDDE3C003AA"
+                      "sha256":  "AF03ABA68F71D8754CA44DCB10DE739BCA5D4D078D7365B9FD5131CAA4C64D12"
+                  },
+                  {
+                      "path":  "policy.example.json",
+                      "bytes":  1512,
+                      "sha256":  "E9AC3656CFB45369CE98F77359F1E9569A30BA4CB569B1188D5B043D0BC9F9E1"
+                  },
+                  {
+                      "path":  "README.md",
+                      "bytes":  13013,
+                      "sha256":  "9D0ED5EAB2496CF051267703C364D65988154B7BE44BB6895F5B1086F3D6DB27"
                   },
                   {
                       "path":  "source-v1/AgentExec.cs",
@@ -106,46 +135,82 @@
                   },
                   {
                       "path":  "tests/integration.py",
-                      "bytes":  9972,
-                      "sha256":  "86E33054893C0CB85B51AF9A5D57A9FC4CE593655E976A92EC8F1E1BDA4DA010"
+                      "bytes":  13767,
+                      "sha256":  "1852E3C24FD8DECCBF7FD5FDA41803A4B5D7216FC28340DAAC3594C2B5BC7A7E"
                   },
                   {
                       "path":  "tests/WinJobSmoke.cs",
-                      "bytes":  16906,
-                      "sha256":  "9F9AE33C25BC404903216EE5E904978A0647954AA50BC8C8D8D3E912807278BF"
+                      "bytes":  26697,
+                      "sha256":  "B1DD40A3A87FC1D5FB6DFBC1781BA470098EE43EAA9EECC38FE3E8E086726D00"
                   },
                   {
                       "path":  "tests/RunStoreTests.cs",
-                      "bytes":  8614,
-                      "sha256":  "C0DA7A19C3A0F5A579B133DE8B042C5A8B94D9E8B172A20D736ABF455715AE88"
+                      "bytes":  20361,
+                      "sha256":  "C280D63BB5A7EBDA0F00F58B59396FADA8A6F529D162A12B544917B1086022C3"
                   },
                   {
                       "path":  "tests/evidence-archive.tests.ps1",
-                      "bytes":  13017,
-                      "sha256":  "23DBA89D4E5ED42DD57280D3998D10242BC55C79B1582655EC8880F6DB8E3251"
+                      "bytes":  13151,
+                      "sha256":  "F951C00E5D6018F8A24052154C26F85F53BE7A1D59DC1CAA946199AB2828BA75"
                   },
                   {
                       "path":  "tests/storage-access.tests.ps1",
-                      "bytes":  13734,
-                      "sha256":  "78C2A661E973E9C1E8C7EDA3F01F63C5345D50F1A861F2D80D961F6E927BA7DA"
+                      "bytes":  14649,
+                      "sha256":  "30092F8A6CB46552ACAAAD2693B2971A2F552E1A4BB69306BFE45CAF6C1012F2"
+                  },
+                  {
+                      "path":  "tests/telemetry-lifecycle.tests.ps1",
+                      "bytes":  13899,
+                      "sha256":  "99B704EA25EC0C80D0E026F51C0402E8C780FA66FE2CAE897E1CE17DB87F514F"
+                  },
+                  {
+                      "path":  "tests/mutex-principals.ps1",
+                      "bytes":  7263,
+                      "sha256":  "0A58AA7724B7F282E21046FC13494EDE48EEB099929C67A90F447C5D17AB7166"
                   },
                   {
                       "path":  "tests/agy-native-check.txt",
-                      "bytes":  1262,
-                      "sha256":  "48286CFBCF3B5F3080CBB05CD86C6D807CC2BF2E766D3F013D16BEFAA5FF4D5F"
+                      "bytes":  1673,
+                      "sha256":  "8866B2D19C92585055CECAAF370BD7D849879BAEDD15A01137A55082C27185E5"
                   }
               ],
     "validation":  {
-                       "integration_checks":  19,
-                       "native_lifecycle_behaviors":  12,
-                       "private_storage_checks":  34,
-                       "archive_checks":  75,
-                       "native_Codex_route":  "PASS raw denied; managed completed; tree cleanup confirmed",
-                       "native_AGY_TUI_route":  "PASS raw denied; managed completed; tree cleanup confirmed",
-                       "native_SYSTEM_maintenance":  "PASS on accepted telemetry source",
-                       "stress_tests":  "NOT RUN",
-                       "headless_AGY_model_route":  "UNQUALIFIED: native keyring authentication timeout",
-                       "crash_root_consumer":  "UNKNOWN",
-                       "ordinary_work_stability":  "Observe after acceptance; absence of future crashes not established"
-                   }
+                       "compile":  "PASS",
+                       "integration":  29,
+                       "native_lifecycle_and_output":  21,
+                       "store":  53,
+                       "telemetry_lifecycle_maintenance_uninstall":  23,
+                       "private_storage":  34,
+                       "archive":  75,
+                       "native_handle_counter":  {
+                                                     "valid":  275,
+                                                     "total":  275,
+                                                     "status":  0
+                                                 },
+                       "principal_control":  "default SYSTEM mutex denies user; reviewed helper allows both directions; temporary tasks and Jobs cleaned",
+                       "independent_CSharp_review":  "PASS exact candidate",
+                       "independent_telemetry_review":  "PASS exact source",
+                       "fixtures_remaining":  0,
+                       "stress":  "NOT RUN",
+                       "ci":  "No repository workflow configured; required local checks completed",
+                       "installed_v3":  "PENDING",
+                       "native_Codex_v3":  "PENDING",
+                       "native_AGY_TUI_v3":  "PENDING",
+                       "first_failures":  [
+                                              "Integration fixture short/full Windows path mismatch fixed by canonical path resolution",
+                                              "TemporaryDirectory variable overwritten by policy fixture; test lifetime fixed",
+                                              "Uninstall preflight task query could hide error; fail-closed query and meaningful regression fixed"
+                                          ]
+                   },
+    "limits":  {
+                   "memory_mb_per_tree":  2048,
+                   "processes_per_tree":  32,
+                   "concurrent":  4,
+                   "heavy":  1,
+                   "maximum_timeout_seconds":  1800,
+                   "output_bytes":  65536,
+                   "ordinary_days":  7,
+                   "incident_days":  30,
+                   "aggregate_bytes":  536870912
+               }
 }
