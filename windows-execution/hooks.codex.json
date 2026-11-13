@@ -1,0 +1,15 @@
+{
+  "description": "Shared Windows execution admission; preserves submitted input and native approval policy.",
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "^Bash$",
+      "hooks": [{
+        "type": "command",
+        "command": "C:/Users/Администратор/.agents/windows-execution/agent-exec.v1.exe hook codex",
+        "commandWindows": "C:/Users/Администратор/.agents/windows-execution/agent-exec.v1.exe hook codex",
+        "timeout": 3,
+        "async": false
+      }]
+    }]
+  }
+}

@@ -1,0 +1,3 @@
+# Preserve accepted source bytes, including their original BOM and line endings.
+# -text disables conversion; Git can still display text diffs.
+* -text

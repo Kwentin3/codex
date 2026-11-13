@@ -1,0 +1,151 @@
+{
+    "schema_version":  1,
+    "accepted_date":  "2026-11-13",
+    "platform":  "Windows Server 2019 x64; Windows PowerShell 5.1; .NET Framework compiler",
+    "purpose":  "Source snapshot of the accepted local installation; source files below are byte-exact. Private diagnostics/configuration and executable binaries excluded.",
+    "accepted_binaries":  [
+                              {
+                                  "name":  "agent-exec.v1.exe",
+                                  "sha256":  "6E02570190096146FB44578883B8207C96AA72581E61A9EDCB6E552253ED0194",
+                                  "role":  "Managed execution and Codex hook",
+                                  "source_directory":  "source-v1"
+                              },
+                              {
+                                  "name":  "agent-exec.v2.exe",
+                                  "sha256":  "8803B7B7EDFEEBAC9EA669F2C1B30D864FE061A23033C810BCEF5FBD555C3AF5",
+                                  "role":  "Antigravity hook; canonical managed execution remains v1",
+                                  "source_directory":  "."
+                              }
+                          ],
+    "build":  {
+                  "compiler":  "Framework64/v4.0.30319/csc.exe",
+                  "observed_compiler_sha256":  "4240A12E0B246C9D69AF1F697488FE7DA1B497DF20F4A6F95135B4D5FE180A57",
+                  "v1_historical_compiler_hash_verified":  false,
+                  "arguments":  [
+                                    "/nologo",
+                                    "/langversion:5",
+                                    "/codepage:65001",
+                                    "/target:exe",
+                                    "/platform:x64",
+                                    "/optimize+",
+                                    "/r:System.Web.Extensions.dll",
+                                    "/r:System.Management.dll"
+                                ],
+                  "deterministic_binary_rebuild_proven":  false
+              },
+    "files":  [
+                  {
+                      "path":  "AgentExec.cs",
+                      "bytes":  20407,
+                      "sha256":  "D9E905F8D470F2844ABCE8B46EC1287EF7839A7644D0EB893B4A46A23D2DE6DF"
+                  },
+                  {
+                      "path":  "ShellCommand.cs",
+                      "bytes":  6364,
+                      "sha256":  "8256E3F78511AE1251B620BCC90730476220FABAF6D9043365026AD92750AB6D"
+                  },
+                  {
+                      "path":  "RunStore.cs",
+                      "bytes":  31997,
+                      "sha256":  "9578D254FF12BFFFFF280CF30328CA6DD8037B91C91F71DE51DC645E613817E8"
+                  },
+                  {
+                      "path":  "WinJob.cs",
+                      "bytes":  37132,
+                      "sha256":  "874675BAD356E7B46BF18B9865F6505A509455DF6409ACBC7250611D447E809B"
+                  },
+                  {
+                      "path":  "build.ps1",
+                      "bytes":  892,
+                      "sha256":  "40089862663C670CA39A4F35FC59567A5CAF69658469EA0E8683EEC812FC4594"
+                  },
+                  {
+                      "path":  "telemetry.ps1",
+                      "bytes":  46569,
+                      "sha256":  "7CF6744A2880B624B6C57B66675431FDCE1550B124FBCEC2AD22D4583BEF22A1"
+                  },
+                  {
+                      "path":  "install.ps1",
+                      "bytes":  6489,
+                      "sha256":  "C63E3FBC9889A398F4BF7D9E7899DA6C9AAA106F7D0DF08BF050048B4D37CB5C"
+                  },
+                  {
+                      "path":  "rollback.ps1",
+                      "bytes":  1162,
+                      "sha256":  "BA55BE30655ABC9843FC266B51D5E8AC78E6F6A0CE95D97BF3861254F4DB3AB1"
+                  },
+                  {
+                      "path":  "hooks.codex.json",
+                      "bytes":  518,
+                      "sha256":  "66DD6ADBDB89FEE431159F6B3B095FFAE1F02019239C01B18190CB7A80491905"
+                  },
+                  {
+                      "path":  "hooks.agy.json",
+                      "bytes":  300,
+                      "sha256":  "181C9693AF3C8B8E6C2FFA67D63CE0E22BFF40B13F4E48C054BD3EDDE3C003AA"
+                  },
+                  {
+                      "path":  "source-v1/AgentExec.cs",
+                      "bytes":  20330,
+                      "sha256":  "FD03EE70D79D7F23BD57B301480D737869689E03A0348676F6EE76B4F83842E5"
+                  },
+                  {
+                      "path":  "source-v1/ShellCommand.cs",
+                      "bytes":  6364,
+                      "sha256":  "8256E3F78511AE1251B620BCC90730476220FABAF6D9043365026AD92750AB6D"
+                  },
+                  {
+                      "path":  "source-v1/RunStore.cs",
+                      "bytes":  31548,
+                      "sha256":  "70FC284BDE9C0BC602BB0ADFD149EE7931F2621F65D82E60FC57FB0E937B7A88"
+                  },
+                  {
+                      "path":  "source-v1/WinJob.cs",
+                      "bytes":  37132,
+                      "sha256":  "874675BAD356E7B46BF18B9865F6505A509455DF6409ACBC7250611D447E809B"
+                  },
+                  {
+                      "path":  "tests/integration.py",
+                      "bytes":  9972,
+                      "sha256":  "86E33054893C0CB85B51AF9A5D57A9FC4CE593655E976A92EC8F1E1BDA4DA010"
+                  },
+                  {
+                      "path":  "tests/WinJobSmoke.cs",
+                      "bytes":  16906,
+                      "sha256":  "9F9AE33C25BC404903216EE5E904978A0647954AA50BC8C8D8D3E912807278BF"
+                  },
+                  {
+                      "path":  "tests/RunStoreTests.cs",
+                      "bytes":  8614,
+                      "sha256":  "C0DA7A19C3A0F5A579B133DE8B042C5A8B94D9E8B172A20D736ABF455715AE88"
+                  },
+                  {
+                      "path":  "tests/evidence-archive.tests.ps1",
+                      "bytes":  13017,
+                      "sha256":  "23DBA89D4E5ED42DD57280D3998D10242BC55C79B1582655EC8880F6DB8E3251"
+                  },
+                  {
+                      "path":  "tests/storage-access.tests.ps1",
+                      "bytes":  13734,
+                      "sha256":  "78C2A661E973E9C1E8C7EDA3F01F63C5345D50F1A861F2D80D961F6E927BA7DA"
+                  },
+                  {
+                      "path":  "tests/agy-native-check.txt",
+                      "bytes":  1262,
+                      "sha256":  "48286CFBCF3B5F3080CBB05CD86C6D807CC2BF2E766D3F013D16BEFAA5FF4D5F"
+                  }
+              ],
+    "validation":  {
+                       "integration_checks":  19,
+                       "native_lifecycle_behaviors":  12,
+                       "private_storage_checks":  34,
+                       "archive_checks":  75,
+                       "native_Codex_route":  "PASS raw denied; managed completed; tree cleanup confirmed",
+                       "native_AGY_TUI_route":  "PASS raw denied; managed completed; tree cleanup confirmed",
+                       "native_SYSTEM_maintenance":  "PASS on accepted telemetry source",
+                       "stress_tests":  "NOT RUN",
+                       "headless_AGY_model_route":  "UNQUALIFIED: native keyring authentication timeout",
+                       "crash_root_consumer":  "UNKNOWN",
+                       "ordinary_work_stability":  "Observe after acceptance; absence of future crashes not established"
+                   }
+}

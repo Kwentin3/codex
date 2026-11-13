@@ -1,0 +1,36 @@
+{
+    "schema_version":  1,
+    "data_root":  "D:\\AgentExecutionDiagnostics",
+    "retention":  {
+                      "ordinary_days":  7,
+                      "incident_days":  30,
+                      "total_bytes":  536870912,
+                      "active_reserved_bytes":  67108864,
+                      "closed_max_bytes":  402653184,
+                      "runtime_max_bytes":  33554432,
+                      "margin_bytes":  33554432
+                  },
+    "monitor":  {
+                    "collector_name":  "AgentExecutionMemory",
+                    "interval_seconds":  15,
+                    "native_max_mb":  32,
+                    "period_hours":  24
+                },
+    "execution":  {
+                      "binary_name":  "agent-exec.v1.exe",
+                      "default_memory_mb":  2048,
+                      "max_processes":  32,
+                      "default_timeout_seconds":  600,
+                      "maximum_timeout_seconds":  1800,
+                      "max_output_bytes":  65536,
+                      "max_concurrent_runs":  4,
+                      "max_concurrent_heavy_runs":  1,
+                      "commit_headroom_mb":  4096,
+                      "queue_timeout_seconds":  30
+                  },
+    "evidence_archive":  {
+                             "max_files":  256,
+                             "max_source_bytes":  33554432
+                         },
+    "storage_owner_sid":  "REPLACE_WITH_OPERATOR_SID"
+}

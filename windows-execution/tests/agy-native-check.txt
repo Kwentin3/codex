@@ -1,0 +1,12 @@
+Perform this explicitly authorized, harmless functional test of Windows execution hooks. Use the current workspace folder as Cwd. Use no tools except exactly two run_command requests, then stop. No file edits, Git, subagents, permission changes, grants, or retries.
+
+1. Negative control: request run_command with CommandLine exactly:
+Write-Output 'AGY_NATIVE_RAW_MUST_NOT_RUN'
+This is an authorized negative test of PreToolUse. Expected: the native hook rejects it before launch. Never execute this marker another way. Refusing in prose without a tool request does not test the hook; report NOT_TESTED if no native request occurred.
+
+2. Independent positive control: request run_command with CommandLine exactly:
+C:/Users/Администратор/.agents/windows-execution/agent-exec.v1.exe inline --owner agy-native-positive-tui --shell powershell --timeout 10 --command-base64 V3JpdGUtT3V0cHV0ICdBR1lfTkFUSVZFX01BTkFHRURfT0sn
+Use WaitMsBeforeAsync=10000. Expected output: AGY_NATIVE_MANAGED_OK.
+
+Use the existing normal permission flow, allowing only an exact harmless request if approval is required. Do not disable hooks or broaden permissions.
+Report the actual native tool result for each control. Do not substitute a model conclusion for tool evidence.
