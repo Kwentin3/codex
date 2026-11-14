@@ -3,10 +3,43 @@
 Дата исходного разбора: 13 ноября 2026. Проверен снимок
 689ca8157afb63e1f680aa179084e5ac29dec521 и установленный v1.
 Это единственная текущая запись согласованного GOAL; состояние обновлено
-14 ноября после перезагрузки VS Code. GOAL BLOCKED, полная поставка не завершена.
-Барьер: для свежей авторизации AGY требуется личное участие в Google-входе.
-Ожидавший процесс завершён, активных запусков нет; продолжение после ответа
-пользователя о готовности войти. Новые попытки входа без этого ответа не запускаются.
+14 ноября после перезагрузки VS Code. Полный GOAL остаётся INCOMPLETE.
+Пользователь подтвердил готовность Google-входа; успешный вход в установленный
+AGY1.1.27 наблюдался в native TUI. Один новый одноразовый код прочитан из буфера
+ровно один раз по явному ответу и передан прямо клиенту; в файлы/модель не записан.
+
+Новый принятый результат: actual raw run_command получил точный native отказ
+v3 gate. Первичная expanded tool card сохранена без thought/account/auth данных.
+Положительный контроль дошёл до обычного native permission prompt; выбран Yes
+once, широкие conversation/persistent allowlist не добавлялись. Затем НАШ
+дополнительный --sandbox запросил UAC setup. Реальная policy проверена:
+enableTerminalSandbox=false. Setup не одобрялся. Только наш optional flag
+удалён из следующего запуска; обычные native permissions и общий v3 Job сохранены.
+Независимое ревью этой границы PASS. Первый owner aafdb26fa845416390e27e088e33e30f
+остановлен адресно: shell exit0/exited, cleanup=true/active0, exact Job отсутствует;
+это не является успешным результатом положительной managed-команды.
+
+После перезапуска обычный AGY не восстановил вход; причина неизвестна.
+Запрошен свежий код. До второго ответа clipboard не читался. Второй owner
+b8434bcbfdac45edba5f6192b1c12ff5 завершился timeout124 по сроку600s,
+cleanup=true/active0; exact Job отсутствует. Пакет трёх оставшихся тестов в нём
+не подавался. Подготовленная positive fixture добавляет фактический вывод CWD
+рядом с AGY_V3_MANAGED_OK, без дополнительного вызова. Для продолжения нужен
+свежий OAuth в обычном режиме, затем сохранить эту сессию до всех трёх тестов.
+
+Оба глобальных hooks снова точные оригиналы; native AGY config hash остался
+46D8494205D82C6076B9215D8EA7EDA5310DB15D10C61E0923F56DD71CD4D981,
+числовая policy и native approvals не менялись. Приватный ordinary-архив
+history/ae-20261114T104859799Z-b240c358.zip (13696B, source4/11738B)
+содержит raw evidence и actual ordinary-route fixture. Его хранение7суток
+контролирует прежний telemetry owner внутри512МиБ. Проверены архивные копии,
+убраны восстановленная PTY-папка (9081B), evidence-дубликат и два новых backup
+дубликата. Три-case packet намеренно сохранён для оставшейся приёмки.
+rollback.ps1 -WhatIf PASS; активных/незавершённых task runs не осталось.
+Независимая сверка текущего этапа PASS: первичная raw card, 50 artifact entries,
+24 source files, exact installed snapshot и восстановленные hooks. Это приёмка
+границы raw PASS / три pending; полный GOAL остаётся INCOMPLETE.
+
 Остаётся реальная AGY-приёмка; для текущего состояния metadata, откат и
 безопасная уборка сверены. После AGY-тестов завершить затронутую часть поставки.
 Issues остаются открытыми до проверки соответствующего результата.
@@ -59,7 +92,7 @@ owner_gone_job_absent, exit=null, cleanup=true/active0 и убрал claim/scrip
 Неизвестный исходный exit не заменён успехом. Временный Codex hook возвращён
 к исходным байтам EC873E2A91428DCB74EF21C6E4676CECDC8F2D08D1F03C6003A1EAE50DB8A5C3.
 
-AGY-приёмка v3 остаётся NOT VERIFIED. Прежние headless/TTY/winpty попытки
+Полная AGY-приёмка v3 остаётся NOT VERIFIED; raw gate принят выше. Исторические headless/TTY/winpty попытки
 остановлены с подтверждённой очисткой; WinPTY завершился assertion cols/rows
 до AGY. После Reload запас Commit позволил продолжить без снижения резерва.
 Настоящий ConPTY получен через уже установленный VS Code node-pty и его
@@ -117,13 +150,13 @@ before-копиями; rollback-WhatIf тогда PASS. Полные rollback-as
 диагностики подтверждён только соответствующий семантический TOML delta;
 агент доверие не записывал, installed hash rollback-entry обновлён.
 Metadata/provenance синхронизированы с текущим состоянием; artifact manifest
-содержит49 проверенных записей, source snapshot24 точных файла. Исходная
+содержит50 проверенных записей, source snapshot24 точных файла. Исходная
 квалификация сборки закреплена за e3146, её hash не подменён новым снимком.
-Независимая сверка текущего этапа PASS: 49 entries, 24 source files,
+Независимая сверка предыдущего этапа PASS: 49 entries, 24 source files,
 21 provenance reference, оба hooks, native config, rollback и active/pending=0.
 Полный GOAL остаётся INCOMPLETE из-за незавершённой AGY-приёмки.
-Открыта именно AGY-приёмка: свежий личный вход, затем четыре actual run_command
-(raw denial, managed success, error, timeout) и финализация затронутого участка.
+Открыта оставшаяся AGY-приёмка: свежий личный вход, затем три actual run_command
+(managed success/CWD, error, timeout) и финализация затронутого участка.
 CI workflow отсутствует; обязательные локальные проверки пройдены.
 Remote/production и Hermes runtime не менялись. Первопричина прежнего OOM открыта.
 

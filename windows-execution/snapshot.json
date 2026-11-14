@@ -1,7 +1,7 @@
 {
     "schema_version":  2,
-    "checked_utc":  "2026-11-14T10:07:56.7719698Z",
-    "stage":  "Installed; Codex and SYSTEM accepted; AGY actual acceptance blocked on personal Google OAuth; temporary hooks restored and cleanup verified",
+    "checked_utc":  "2026-11-14T10:53:31.4811185Z",
+    "stage":  "Installed; Codex and SYSTEM accepted; AGY native raw denial accepted, three ordinary cases await fresh OAuth; temporary hooks restored and cleanup verified",
     "platform":  "Windows Server 2019 x64 / PowerShell 5.1 / .NET Framework C#5",
     "historical_baseline":  {
                                 "commit":  "689ca8157afb63e1f680aa179084e5ac29dec521",
@@ -195,7 +195,7 @@
                        "ci":  "No repository workflow configured; required local checks completed",
                        "installed_v3":  "PASS exact published candidate bytes; no rebuild",
                        "native_Codex_v3":  "PASS native raw denial and managed marker; receipt cleanup=true/active0",
-                       "native_AGY_TUI_v3":  "True ConPTY and exact Job membership PASS; auth required on1.1.27 and temporary1.1.28; native tool acceptance NOT VERIFIED; all test processes stopped and temporary package removed",
+                       "native_AGY_TUI_v3":  "PARTIAL raw gate PASS on installed1.1.27; authenticated TUI seen; three remaining ordinary-route cases NOT VERIFIED; all owned processes stopped",
                        "first_failures":  [
                                               "Integration fixture short/full Windows path mismatch fixed by canonical path resolution",
                                               "TemporaryDirectory variable overwritten by policy fixture; test lifetime fixed",
@@ -220,8 +220,8 @@
                                                 "next_segment_retention_class":  "incident",
                                                 "gap_count":  0
                                             },
-                       "client_hook_error_timeout":  "Codex PASS by native receipt and bounded process observation; AGY pending",
-                       "rollback_preflight":  "PASS after both exact hooks restored and user-native trust delta reconciled",
+                       "client_hook_error_timeout":  "Codex PASS; AGY error/timeout NOT RUN",
+                       "rollback_preflight":  "PASS after phase3 exact hook restoration; no UAC setup or native permission override",
                        "installation_cleanup":  {
                                                     "status":  "PASS current installation cleanup",
                                                     "run_id":  "b0429da24a914d4890726a5ca34ad68e",
@@ -238,7 +238,7 @@
                                                                                ]
                                                 },
                        "client_hook_error_timeout_preparation":  {
-                                                                     "status":  "Both diagnostic hooks restored; Codex accepted, AGY actual tests pending",
+                                                                     "status":  "Both temporary hooks restored; AGY raw accepted, three cases pending",
                                                                      "directory":  ".local/client-hook-checks",
                                                                      "native_timeout_seconds":  3,
                                                                      "job_deadline_seconds":  10,
@@ -247,10 +247,11 @@
                                                                      "codex_candidate_sha256":  "5E0FCF5271653789B3B755A6D16CFC8A97FCB4F1396500630C30FE12060047CB",
                                                                      "agy_candidate_sha256":  "2C3D8CDDF5F841E0AD4BC14AE18629DCB26CE8FC79916D621D9E274AAA256605",
                                                                      "agy_test_cases":  4,
-                                                                     "native_review_trust":  "belongs to client and user; not written by agent"
+                                                                     "native_review_trust":  "belongs to client and user; not written by agent",
+                                                                     "agy_remaining_cases":  3
                                                                  },
                        "native_probe_activation":  {
-                                                       "stage":  "both-restored-agy-auth-window-expired",
+                                                       "stage":  "phase3-restored-raw-accepted-three-ordinary-cases-await-fresh-auth",
                                                        "transaction":  "rollback/client-hook-checks/transaction.json",
                                                        "original_hook_backups_verified":  2,
                                                        "backup_files_private":  4,
@@ -260,7 +261,7 @@
                                                        "codex_raw_negative_with_probes_installed":  "PASS exact v3 denial",
                                                        "config_trust_written_by_agent":  false,
                                                        "user_client_availability":  "confirmed",
-                                                       "native_results":  "Codex PASS gate/error/timeout; AGY pending"
+                                                       "native_results":  "Codex gate/error/timeout PASS; AGY raw gate PASS; managed/error/timeout pending"
                                                    },
                        "codex_client_hook_behavior":  {
                                                           "status":  "PASS Codex; AGY pending",
@@ -332,7 +333,55 @@
                                                          "ordinary_days":  7,
                                                          "original_rollback_assets_preserved":  true,
                                                          "qualified_candidate_v3_and_upgrade_recipe_retained":  true,
-                                                         "original_OOM_culprit":  "UNKNOWN"
+                                                         "original_OOM_culprit":  "UNKNOWN",
+                                                         "phase3":  {
+                                                                        "status":  "PARTIAL: native raw denial PASS; three ordinary cases pending",
+                                                                        "cli_version":  "1.1.27",
+                                                                        "cli_sha256":  "D3BAE6895069231C169F427C99527D1F556951E9C43488F45E8B040FBF3011ED",
+                                                                        "v3_sha256":  "6C2C43DE129F6675D2C02102D921F25ED36D0C12EF99A7A7D1978A8E67AAD9A9",
+                                                                        "native_signin_TUI_seen":  true,
+                                                                        "authorization_code_forwarded_once":  true,
+                                                                        "authorization_code_in_files":  false,
+                                                                        "raw_native_tool_card":  "PASS exact v3 readable-route denial; primary expanded card archived without thought/account/auth",
+                                                                        "first_run_id":  "aafdb26fa845416390e27e088e33e30f",
+                                                                        "first_run_shell_exit":  0,
+                                                                        "first_run_cleanup_confirmed":  true,
+                                                                        "first_run_job_absent":  true,
+                                                                        "managed_positive":  "NOT VERIFIED: Yes once chosen, then our optional sandbox requested UAC; no setup approved",
+                                                                        "broad_allowlist_added":  false,
+                                                                        "user_enableTerminalSandbox":  false,
+                                                                        "removed_only_our_optional_session_flag":  true,
+                                                                        "independent_boundary_review":  "PASS ordinary route restored; global/native policy not disabled",
+                                                                        "native_AGY_config_sha256":  "46D8494205D82C6076B9215D8EA7EDA5310DB15D10C61E0923F56DD71CD4D981",
+                                                                        "ordinary_retry_run_id":  "b8434bcbfdac45edba5f6192b1c12ff5",
+                                                                        "ordinary_retry_exit":  124,
+                                                                        "ordinary_retry_reason":  "timeout",
+                                                                        "ordinary_retry_deadline_seconds":  600,
+                                                                        "ordinary_retry_cleanup_confirmed":  true,
+                                                                        "ordinary_retry_job_absent":  true,
+                                                                        "second_code_received":  false,
+                                                                        "second_clipboard_read":  false,
+                                                                        "remaining_packet_submitted":  false,
+                                                                        "remaining_cases":  [
+                                                                                                "managed marker and actual CWD",
+                                                                                                "hook error",
+                                                                                                "hook timeout"
+                                                                                            ],
+                                                                        "positive_CWD_fixture_prepared":  true,
+                                                                        "fresh_auth_required":  true,
+                                                                        "auth_restore_failure_cause":  "UNKNOWN",
+                                                                        "evidence_archive":  "D:/AgentExecutionDiagnostics/history/ae-20261114T104859799Z-b240c358.zip",
+                                                                        "evidence_source_files":  4,
+                                                                        "evidence_source_bytes":  11738,
+                                                                        "evidence_archive_bytes":  13696,
+                                                                        "retention_class":  "ordinary",
+                                                                        "days":  7,
+                                                                        "source_staging_removed":  true,
+                                                                        "source_bytes_removed":  9081,
+                                                                        "extra_backup_duplicates_removed":  2,
+                                                                        "three_case_packet_intentionally_retained":  true,
+                                                                        "rollback_whatif":  "PASS after exact restoration"
+                                                                    }
                                                      },
                        "last_AGY_auth_attempt":  {
                                                      "status":  "NOT VERIFIED; bounded personal OAuth wait expired",
@@ -359,7 +408,55 @@
                                                      "profile_config_sha256":  "46D8494205D82C6076B9215D8EA7EDA5310DB15D10C61E0923F56DD71CD4D981",
                                                      "auth_failure_cause":  "UNKNOWN; release identity-lookup fix alone did not resolve current startup",
                                                      "next":  "Fresh native OAuth URL required; closed-window code must not be consumed"
-                                                 }
+                                                 },
+                       "AGY_phase3":  {
+                                          "status":  "PARTIAL: native raw denial PASS; three ordinary cases pending",
+                                          "cli_version":  "1.1.27",
+                                          "cli_sha256":  "D3BAE6895069231C169F427C99527D1F556951E9C43488F45E8B040FBF3011ED",
+                                          "v3_sha256":  "6C2C43DE129F6675D2C02102D921F25ED36D0C12EF99A7A7D1978A8E67AAD9A9",
+                                          "native_signin_TUI_seen":  true,
+                                          "authorization_code_forwarded_once":  true,
+                                          "authorization_code_in_files":  false,
+                                          "raw_native_tool_card":  "PASS exact v3 readable-route denial; primary expanded card archived without thought/account/auth",
+                                          "first_run_id":  "aafdb26fa845416390e27e088e33e30f",
+                                          "first_run_shell_exit":  0,
+                                          "first_run_cleanup_confirmed":  true,
+                                          "first_run_job_absent":  true,
+                                          "managed_positive":  "NOT VERIFIED: Yes once chosen, then our optional sandbox requested UAC; no setup approved",
+                                          "broad_allowlist_added":  false,
+                                          "user_enableTerminalSandbox":  false,
+                                          "removed_only_our_optional_session_flag":  true,
+                                          "independent_boundary_review":  "PASS ordinary route restored; global/native policy not disabled",
+                                          "native_AGY_config_sha256":  "46D8494205D82C6076B9215D8EA7EDA5310DB15D10C61E0923F56DD71CD4D981",
+                                          "ordinary_retry_run_id":  "b8434bcbfdac45edba5f6192b1c12ff5",
+                                          "ordinary_retry_exit":  124,
+                                          "ordinary_retry_reason":  "timeout",
+                                          "ordinary_retry_deadline_seconds":  600,
+                                          "ordinary_retry_cleanup_confirmed":  true,
+                                          "ordinary_retry_job_absent":  true,
+                                          "second_code_received":  false,
+                                          "second_clipboard_read":  false,
+                                          "remaining_packet_submitted":  false,
+                                          "remaining_cases":  [
+                                                                  "managed marker and actual CWD",
+                                                                  "hook error",
+                                                                  "hook timeout"
+                                                              ],
+                                          "positive_CWD_fixture_prepared":  true,
+                                          "fresh_auth_required":  true,
+                                          "auth_restore_failure_cause":  "UNKNOWN",
+                                          "evidence_archive":  "D:/AgentExecutionDiagnostics/history/ae-20261114T104859799Z-b240c358.zip",
+                                          "evidence_source_files":  4,
+                                          "evidence_source_bytes":  11738,
+                                          "evidence_archive_bytes":  13696,
+                                          "retention_class":  "ordinary",
+                                          "days":  7,
+                                          "source_staging_removed":  true,
+                                          "source_bytes_removed":  9081,
+                                          "extra_backup_duplicates_removed":  2,
+                                          "three_case_packet_intentionally_retained":  true,
+                                          "rollback_whatif":  "PASS after exact restoration"
+                                      }
                    },
     "limits":  {
                    "memory_mb_per_tree":  2048,
@@ -373,15 +470,15 @@
                    "aggregate_bytes":  536870912
                },
     "delivery":  {
-                     "goal_status":  "blocked-awaiting-personal-AGY-OAuth",
-                     "reason":  "Same personal Google sign-in dependency remains; no live auth process, no further safe independent work. Fresh user availability reply required before next bounded OAuth run.",
+                     "goal_status":  "incomplete-awaiting-three-ordinary-AGY-cases",
+                     "reason":  "User completed first fresh OAuth and AGY raw gate passed; unnecessary per-session sandbox flag removed; ordinary retry needed fresh OAuth and its wait expired",
                      "temporary_codex_hook_installed":  false,
                      "temporary_agy_hook_installed":  false,
                      "scope_unchanged":  true,
                      "remaining":  [
-                                       "Fresh personal Google OAuth in a new bounded AGY run",
-                                       "Four actual AGY native raw/managed/error/timeout cases",
-                                       "Finalize affected hooks/evidence/metadata and exact cleanup after AGY acceptance"
+                                       "Fresh personal Google OAuth in ordinary AGY; no extra --sandbox override, keep that same session for tests",
+                                       "Three actual AGY native cases: managed success with CWD, hook error, hook timeout",
+                                       "Finalize affected evidence/metadata and exact cleanup after acceptance"
                                    ]
                  }
 }
