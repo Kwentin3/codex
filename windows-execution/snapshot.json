@@ -1,6 +1,6 @@
 {
     "schema_version":  2,
-    "checked_utc":  "2026-11-14T07:02:31.4255774Z",
+    "checked_utc":  "2026-11-14T07:28:02.9282674Z",
     "stage":  "installed; native Codex and SYSTEM tasks accepted; AGY and final acceptance pending",
     "platform":  "Windows Server 2019 x64 / PowerShell 5.1 / .NET Framework C#5",
     "historical_baseline":  {
@@ -221,7 +221,7 @@
                                                 "gap_count":  0
                                             },
                        "client_hook_error_timeout":  "NOT VERIFIED on exact installed clients",
-                       "rollback_preflight":  "PASS native WhatIf; original backup hashes preserved",
+                       "rollback_preflight":  "LAST PASS before temporary probes; repeat after exact restoration",
                        "installation_cleanup":  {
                                                     "status":  "PASS current installation cleanup",
                                                     "run_id":  "b0429da24a914d4890726a5ca34ad68e",
@@ -238,7 +238,7 @@
                                                                                ]
                                                 },
                        "client_hook_error_timeout_preparation":  {
-                                                                     "status":  "READY syntax/embedding/base-gate verified; NOT INSTALLED",
+                                                                     "status":  "TEMPORARILY INSTALLED; native trust/results pending",
                                                                      "directory":  ".local/client-hook-checks",
                                                                      "native_timeout_seconds":  3,
                                                                      "job_deadline_seconds":  10,
@@ -248,7 +248,20 @@
                                                                      "agy_candidate_sha256":  "2C3D8CDDF5F841E0AD4BC14AE18629DCB26CE8FC79916D621D9E274AAA256605",
                                                                      "agy_test_cases":  4,
                                                                      "native_review_trust":  "belongs to client and user; not written by agent"
-                                                                 }
+                                                                 },
+                       "native_probe_activation":  {
+                                                       "stage":  "installed-awaiting-native-trust-and-tests",
+                                                       "transaction":  "rollback/client-hook-checks/transaction.json",
+                                                       "original_hook_backups_verified":  2,
+                                                       "backup_files_private":  4,
+                                                       "native_timeout_seconds":  3,
+                                                       "managed_job_deadline_seconds":  10,
+                                                       "first_gate_unchanged":  true,
+                                                       "codex_raw_negative_with_probes_installed":  "PASS exact v3 denial",
+                                                       "config_trust_written_by_agent":  false,
+                                                       "user_client_availability":  "confirmed",
+                                                       "native_results":  "PENDING"
+                                                   }
                    },
     "limits":  {
                    "memory_mb_per_tree":  2048,
@@ -262,11 +275,9 @@
                    "aggregate_bytes":  536870912
                },
     "delivery":  {
-                     "goal_status":  "blocked",
-                     "reason":  "Awaiting native client participation for AGY acceptance and diagnostic hook activation",
-                     "native_test_receipts_observed":  0,
-                     "base_hooks_unchanged":  true,
-                     "active_agy_processes":  0,
+                     "goal_status":  "blocked-awaiting-native-confirmations",
+                     "reason":  "User clients ready; native Codex trust and AGY actual results requested",
+                     "temporary_hooks_installed":  true,
                      "scope_unchanged":  true
                  }
 }
