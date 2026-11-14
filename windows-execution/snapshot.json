@@ -1,7 +1,7 @@
 {
     "schema_version":  2,
-    "checked_utc":  "2026-11-14T07:28:02.9282674Z",
-    "stage":  "installed; native Codex and SYSTEM tasks accepted; AGY and final acceptance pending",
+    "checked_utc":  "2026-11-14T09:52:17.1854281Z",
+    "stage":  "Installed; Codex native gate/error/timeout and SYSTEM accepted; AGY auth and final delivery pending",
     "platform":  "Windows Server 2019 x64 / PowerShell 5.1 / .NET Framework C#5",
     "historical_baseline":  {
                                 "commit":  "689ca8157afb63e1f680aa179084e5ac29dec521",
@@ -195,7 +195,7 @@
                        "ci":  "No repository workflow configured; required local checks completed",
                        "installed_v3":  "PASS exact published candidate bytes; no rebuild",
                        "native_Codex_v3":  "PASS native raw denial and managed marker; receipt cleanup=true/active0",
-                       "native_AGY_TUI_v3":  "NOT VERIFIED; bounded auth/TUI and existing WinPTY probes cleaned",
+                       "native_AGY_TUI_v3":  "True ConPTY/Job membership PASS; login required on1.1.27 and temporaryofficial1.1.28; native tool acceptance pending",
                        "first_failures":  [
                                               "Integration fixture short/full Windows path mismatch fixed by canonical path resolution",
                                               "TemporaryDirectory variable overwritten by policy fixture; test lifetime fixed",
@@ -220,8 +220,8 @@
                                                 "next_segment_retention_class":  "incident",
                                                 "gap_count":  0
                                             },
-                       "client_hook_error_timeout":  "NOT VERIFIED on exact installed clients",
-                       "rollback_preflight":  "LAST PASS before temporary probes; repeat after exact restoration",
+                       "client_hook_error_timeout":  "Codex PASS by native receipt and bounded process observation; AGY pending",
+                       "rollback_preflight":  "Repeat after exact AGY hook restoration; current AGY temporary diagnostic intentionally differs",
                        "installation_cleanup":  {
                                                     "status":  "PASS current installation cleanup",
                                                     "run_id":  "b0429da24a914d4890726a5ca34ad68e",
@@ -238,7 +238,7 @@
                                                                                ]
                                                 },
                        "client_hook_error_timeout_preparation":  {
-                                                                     "status":  "TEMPORARILY INSTALLED; native trust/results pending",
+                                                                     "status":  "Codex restored; AGY temporary diagnostic active; personal OAuth pending",
                                                                      "directory":  ".local/client-hook-checks",
                                                                      "native_timeout_seconds":  3,
                                                                      "job_deadline_seconds":  10,
@@ -250,7 +250,7 @@
                                                                      "native_review_trust":  "belongs to client and user; not written by agent"
                                                                  },
                        "native_probe_activation":  {
-                                                       "stage":  "installed-awaiting-native-trust-and-tests",
+                                                       "stage":  "codex-restored-agy-diagnostics-active",
                                                        "transaction":  "rollback/client-hook-checks/transaction.json",
                                                        "original_hook_backups_verified":  2,
                                                        "backup_files_private":  4,
@@ -260,8 +260,60 @@
                                                        "codex_raw_negative_with_probes_installed":  "PASS exact v3 denial",
                                                        "config_trust_written_by_agent":  false,
                                                        "user_client_availability":  "confirmed",
-                                                       "native_results":  "PENDING"
-                                                   }
+                                                       "native_results":  "Codex PASS gate/error/timeout; AGY pending"
+                                                   },
+                       "codex_client_hook_behavior":  {
+                                                          "status":  "PASS Codex; AGY pending",
+                                                          "client":  "codex-cli 0.169.0-alpha.11.1",
+                                                          "client_sha256":  "A473EDEF0D52C4FFA067060DDD48A3D85720A3256CBD0510AAB71D406F3AF744",
+                                                          "native_deadline_seconds":  3,
+                                                          "diagnostic_job_deadline_seconds":  10,
+                                                          "diagnostic_sleep_seconds":  5,
+                                                          "error":  {
+                                                                        "diagnostic_run_id":  "0bca75e1bd5148f1b081fe4c8232ffe0",
+                                                                        "diagnostic_exit_code":  7,
+                                                                        "actual_run_id":  "51aa0fb8fbf646f69788e5a6183a3a62",
+                                                                        "actual_exit_code":  0,
+                                                                        "cleanup_confirmed":  true,
+                                                                        "active_processes_at_end":  0
+                                                                    },
+                                                          "timeout":  {
+                                                                          "diagnostic_run_id":  "6cc31cd3a3d6416e8343bcf5bee05068",
+                                                                          "workload_seen_running":  true,
+                                                                          "staged_source_exact_match":  true,
+                                                                          "observed_job_active":  2,
+                                                                          "workload_lifetime_to_absent_ms":  2686,
+                                                                          "max_workload_private_bytes":  69492736,
+                                                                          "observer_read_errors":  0,
+                                                                          "actual_run_id":  "f26b74ff1bd94ec19befacf11e3bed5c",
+                                                                          "actual_exit_code":  0,
+                                                                          "cleanup_confirmed":  true,
+                                                                          "active_processes_at_end":  0,
+                                                                          "native_timeout_event_observed":  false,
+                                                                          "finding":  "At native deadline3s with Sleep5, callback ceased and Codex continued the command; internal exception/cancellation mechanism not established"
+                                                                      },
+                                                          "interrupted_receipts":  {
+                                                                                       "run_ids":  [
+                                                                                                       "8649f972a78f4c16b7d19bb88f50975a",
+                                                                                                       "338a5cbf55d8483e8cd47fb8c9077658",
+                                                                                                       "6cc31cd3a3d6416e8343bcf5bee05068"
+                                                                                                   ],
+                                                                                       "owner":  "existing RunStore.Complete after exact Job/controller absence",
+                                                                                       "status":  "interrupted_reconciled",
+                                                                                       "reason":  "owner_gone_job_absent",
+                                                                                       "exit_code":  null,
+                                                                                       "cleanup_confirmed":  true,
+                                                                                       "active_processes_at_end":  0
+                                                                                   },
+                                                          "independent_review":  "PASS narrow Codex9.3; AGY not covered",
+                                                          "evidence_archive":  "D:/AgentExecutionDiagnostics/history/ae-20261114T095027060Z-5e9603a1.zip",
+                                                          "evidence_retention_class":  "ordinary",
+                                                          "evidence_source_files":  2,
+                                                          "evidence_source_bytes":  6784,
+                                                          "evidence_archive_bytes":  8016,
+                                                          "codex_hooks_restored_sha256":  "EC873E2A91428DCB74EF21C6E4676CECDC8F2D08D1F03C6003A1EAE50DB8A5C3",
+                                                          "fail_closed_guaranteed":  false
+                                                      }
                    },
     "limits":  {
                    "memory_mb_per_tree":  2048,
@@ -275,9 +327,15 @@
                    "aggregate_bytes":  536870912
                },
     "delivery":  {
-                     "goal_status":  "blocked-awaiting-native-confirmations",
-                     "reason":  "User clients ready; native Codex trust and AGY actual results requested",
-                     "temporary_hooks_installed":  true,
-                     "scope_unchanged":  true
+                     "goal_status":  "active-awaiting-AGY-native-auth",
+                     "reason":  "User reloaded VS Code; Codex native gate/error/timeout accepted; AGY requires personal Google login, agent will run tests",
+                     "temporary_codex_hook_installed":  false,
+                     "temporary_agy_hook_installed":  true,
+                     "scope_unchanged":  true,
+                     "remaining":  [
+                                       "AGY native raw/managed/error/timeout cases",
+                                       "Restore exact AGY hook bytes and stop all owned participants",
+                                       "Final metadata/rollback/cleanup/publication checks"
+                                   ]
                  }
 }
