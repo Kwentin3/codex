@@ -1,6 +1,6 @@
 {
     "schema_version":  2,
-    "checked_utc":  "2026-11-14T06:36:03.2176231Z",
+    "checked_utc":  "2026-11-14T06:57:21.3819654Z",
     "stage":  "installed; native Codex and SYSTEM tasks accepted; AGY and final acceptance pending",
     "platform":  "Windows Server 2019 x64 / PowerShell 5.1 / .NET Framework C#5",
     "historical_baseline":  {
@@ -221,7 +221,34 @@
                                                 "gap_count":  0
                                             },
                        "client_hook_error_timeout":  "NOT VERIFIED on exact installed clients",
-                       "rollback_preflight":  "PASS native WhatIf; original backup hashes preserved"
+                       "rollback_preflight":  "PASS native WhatIf; original backup hashes preserved",
+                       "installation_cleanup":  {
+                                                    "status":  "PASS current installation cleanup",
+                                                    "run_id":  "b0429da24a914d4890726a5ca34ad68e",
+                                                    "duplicates_removed":  21,
+                                                    "bytes_removed":  246445,
+                                                    "verified_saved_copies":  21,
+                                                    "duplicates_remaining":  0,
+                                                    "rollback_whatif":  "PASS after cleanup",
+                                                    "intentionally_retained":  [
+                                                                                   "historical v1/v2 binaries and source-v1",
+                                                                                   "complete rollback/goal2-before",
+                                                                                   "qualified candidate-v3 artifact until native acceptance",
+                                                                                   "reviewed upgrade-runtime.ps1 installation and rollback recipe"
+                                                                               ]
+                                                },
+                       "client_hook_error_timeout_preparation":  {
+                                                                     "status":  "READY syntax/embedding/base-gate verified; NOT INSTALLED",
+                                                                     "directory":  ".local/client-hook-checks",
+                                                                     "native_timeout_seconds":  3,
+                                                                     "job_deadline_seconds":  10,
+                                                                     "probe_sleep_seconds":  5,
+                                                                     "error_exit":  7,
+                                                                     "codex_candidate_sha256":  "5E0FCF5271653789B3B755A6D16CFC8A97FCB4F1396500630C30FE12060047CB",
+                                                                     "agy_candidate_sha256":  "2C3D8CDDF5F841E0AD4BC14AE18629DCB26CE8FC79916D621D9E274AAA256605",
+                                                                     "agy_test_cases":  4,
+                                                                     "native_review_trust":  "belongs to client and user; not written by agent"
+                                                                 }
                    },
     "limits":  {
                    "memory_mb_per_tree":  2048,
