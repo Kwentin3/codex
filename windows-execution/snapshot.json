@@ -1,6 +1,6 @@
 {
     "schema_version":  2,
-    "checked_utc":  "2026-11-14T06:57:21.3819654Z",
+    "checked_utc":  "2026-11-14T07:02:31.4255774Z",
     "stage":  "installed; native Codex and SYSTEM tasks accepted; AGY and final acceptance pending",
     "platform":  "Windows Server 2019 x64 / PowerShell 5.1 / .NET Framework C#5",
     "historical_baseline":  {
@@ -260,5 +260,13 @@
                    "ordinary_days":  7,
                    "incident_days":  30,
                    "aggregate_bytes":  536870912
-               }
+               },
+    "delivery":  {
+                     "goal_status":  "blocked",
+                     "reason":  "Awaiting native client participation for AGY acceptance and diagnostic hook activation",
+                     "native_test_receipts_observed":  0,
+                     "base_hooks_unchanged":  true,
+                     "active_agy_processes":  0,
+                     "scope_unchanged":  true
+                 }
 }
