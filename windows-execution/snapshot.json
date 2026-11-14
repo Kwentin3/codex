@@ -1,7 +1,7 @@
 {
     "schema_version":  2,
-    "checked_utc":  "2026-11-13T20:45:52.5145990Z",
-    "stage":  "source-validated; installation and native client acceptance pending",
+    "checked_utc":  "2026-11-14T06:36:03.2176231Z",
+    "stage":  "installed; native Codex and SYSTEM tasks accepted; AGY and final acceptance pending",
     "platform":  "Windows Server 2019 x64 / PowerShell 5.1 / .NET Framework C#5",
     "historical_baseline":  {
                                 "commit":  "689ca8157afb63e1f680aa179084e5ac29dec521",
@@ -193,14 +193,35 @@
                        "fixtures_remaining":  0,
                        "stress":  "NOT RUN",
                        "ci":  "No repository workflow configured; required local checks completed",
-                       "installed_v3":  "PENDING",
-                       "native_Codex_v3":  "PENDING",
-                       "native_AGY_TUI_v3":  "PENDING",
+                       "installed_v3":  "PASS exact published candidate bytes; no rebuild",
+                       "native_Codex_v3":  "PASS native raw denial and managed marker; receipt cleanup=true/active0",
+                       "native_AGY_TUI_v3":  "NOT VERIFIED; bounded auth/TUI and existing WinPTY probes cleaned",
                        "first_failures":  [
                                               "Integration fixture short/full Windows path mismatch fixed by canonical path resolution",
                                               "TemporaryDirectory variable overwritten by policy fixture; test lifetime fixed",
                                               "Uninstall preflight task query could hide error; fail-closed query and meaningful regression fixed"
-                                          ]
+                                          ],
+                       "native_SYSTEM_tasks":  "PASS maintenance and manual incident task, result0; no synthetic Event/OOM",
+                       "fresh_closed_BLG":  {
+                                                "status":  "PASS valid samples in all eight groups; sample errors retained",
+                                                "file":  "incidents/ae-20261114T060036230Z-6a105801.blg",
+                                                "sha256":  "686612916BD22A40080A72AF2059E0D1E80DFD4ED99A4926EC121F412D7B40D2",
+                                                "bytes":  3145728,
+                                                "frame_times_utc":  [
+                                                                        "2026-11-14T06:22:07.178Z",
+                                                                        "2026-11-14T06:22:22.182Z"
+                                                                    ],
+                                                "counter_groups":  8,
+                                                "valid_status0_values":  1591,
+                                                "other_status_values":  261,
+                                                "other_status":  2147485649,
+                                                "native_sample_errors":  1,
+                                                "valid_handle_count_values":  527,
+                                                "next_segment_retention_class":  "incident",
+                                                "gap_count":  0
+                                            },
+                       "client_hook_error_timeout":  "NOT VERIFIED on exact installed clients",
+                       "rollback_preflight":  "PASS native WhatIf; original backup hashes preserved"
                    },
     "limits":  {
                    "memory_mb_per_tree":  2048,
