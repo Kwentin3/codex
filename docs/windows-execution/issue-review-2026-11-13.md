@@ -1,164 +1,126 @@
 # Отбор замечаний из issues 1–9
 
-Дата исходного разбора: 13 ноября 2026. Проверен снимок
-689ca8157afb63e1f680aa179084e5ac29dec521 и установленный v1.
-Это единственная текущая запись согласованного GOAL; состояние обновлено
-14 ноября после перезагрузки VS Code. Полный GOAL остаётся INCOMPLETE.
-Пользователь подтвердил готовность Google-входа; успешный вход в установленный
-AGY1.1.27 наблюдался в native TUI. Один новый одноразовый код прочитан из буфера
-ровно один раз по явному ответу и передан прямо клиенту; в файлы/модель не записан.
+Исходный разбор: 13 ноября 2026, snapshot689ca8157afb63e1f680aa179084e5ac29dec521.
+Приёмка согласованного объёма завершена14ноября2026. Эта запись — единственный
+canonical GOAL. Принятые исправления реализованы, опубликованы в main и установлены;
+точные Codex/Antigravity маршруты проверены, временная диагностика снята.
+Отложенные и отклонённые предложения из исходных issues не объявляются выполненными.
+Первопричина прежнего OOM по-прежнему неизвестна; стресс/OOM не воспроизводились.
 
-Новый принятый результат: actual raw run_command получил точный native отказ
-v3 gate. Первичная expanded tool card сохранена без thought/account/auth данных.
-Положительный контроль дошёл до обычного native permission prompt; выбран Yes
-once, широкие conversation/persistent allowlist не добавлялись. Затем НАШ
-дополнительный --sandbox запросил UAC setup. Реальная policy проверена:
-enableTerminalSandbox=false. Setup не одобрялся. Только наш optional flag
-удалён из следующего запуска; обычные native permissions и общий v3 Job сохранены.
-Независимое ревью этой границы PASS. Первый owner aafdb26fa845416390e27e088e33e30f
-остановлен адресно: shell exit0/exited, cleanup=true/active0, exact Job отсутствует;
-это не является успешным результатом положительной managed-команды.
+## Поставка и точный артефакт
 
-После перезапуска обычный AGY не восстановил вход; причина неизвестна.
-Запрошен свежий код. До второго ответа clipboard не читался. Второй owner
-b8434bcbfdac45edba5f6192b1c12ff5 завершился timeout124 по сроку600s,
-cleanup=true/active0; exact Job отсутствует. Пакет трёх оставшихся тестов в нём
-не подавался. Подготовленная positive fixture добавляет фактический вывод CWD
-рядом с AGY_V3_MANAGED_OK, без дополнительного вызова. Для продолжения нужен
-свежий OAuth в обычном режиме, затем сохранить эту сессию до всех трёх тестов.
-
-Оба глобальных hooks снова точные оригиналы; native AGY config hash остался
-46D8494205D82C6076B9215D8EA7EDA5310DB15D10C61E0923F56DD71CD4D981,
-числовая policy и native approvals не менялись. Приватный ordinary-архив
-history/ae-20261114T104859799Z-b240c358.zip (13696B, source4/11738B)
-содержит raw evidence и actual ordinary-route fixture. Его хранение7суток
-контролирует прежний telemetry owner внутри512МиБ. Проверены архивные копии,
-убраны восстановленная PTY-папка (9081B), evidence-дубликат и два новых backup
-дубликата. Три-case packet намеренно сохранён для оставшейся приёмки.
-rollback.ps1 -WhatIf PASS; активных/незавершённых task runs не осталось.
-Независимая сверка текущего этапа PASS: первичная raw card, 50 artifact entries,
-24 source files, exact installed snapshot и восстановленные hooks. Это приёмка
-границы raw PASS / три pending; полный GOAL остаётся INCOMPLETE.
-
-Остаётся реальная AGY-приёмка; для текущего состояния metadata, откат и
-безопасная уборка сверены. После AGY-тестов завершить затронутую часть поставки.
-Issues остаются открытыми до проверки соответствующего результата.
-
-Исправления опубликованы в main, source commit
-e3146ce2b4397e0ac64dcb329820d3fd48ab25a0.
-Установлен единый agent-exec.v3.exe для исполнения и обоих hooks, SHA256
+Implementation commit e3146ce2b4397e0ac64dcb329820d3fd48ab25a0,
+tree3380e24f9e7d4b8a280581bd17c692f3fc2dca16. Установлен единый
+agent-exec.v3.exe (76288B), SHA256
 6C2C43DE129F6675D2C02102D921F25ED36D0C12EF99A7A7D1978A8E67AAD9A9.
-После квалификации бинарник не пересобирался; все 24 файла source snapshot
-сверены с установкой. Исторические v1/v2, source-v1 и rollback-копии сохранены.
+Четыре C# source и квалифицированные байты не менялись после приёмки;
+новой компиляции ради metadata не было. Сохранённая candidate-v3 побайтово
+совпадает с установленным бинарником. Текущий package snapshot включает24файла;
+README уточнён после приёмки, исходная build qualification закреплена за Git
+snapshot e3146 SHA25647F2A35B68C1A562DF6FB9FF66395D2E9AB88A967035BDFD5A0142A55170C124.
+Provenance v1/v2 привязаны к сохранённым исходным bytes; v3 — к точным C#,
+compiler и qualification snapshot. Исторические v1/v2, source-v1, полные
+rollback-assets, candidate-v3 и проверенный upgrade/rollback recipe сохранены.
 
-Проверки PASS: compile, integration29, WinJob21, Store53, telemetry23,
-privacy34, archive75; независимые C#/telemetry source-ревью PASS.
-Первоначальные ошибки изоляции integration (8.3/full path, lifetime
-TemporaryDirectory) и fail-closed preflight uninstall исправлены и проверены.
-Числовые лимиты, operator SID, data_root, retention 7/30 суток и 512 МиБ
-сохранены. Стресс и воспроизведение OOM не выполнялись.
+Проверки PASS: compile; integration29; WinJob21; Store53; telemetry23;
+private storage34; archive75; native Handle Count275/275; независимые C# и
+telemetry source-ревью. Исправленные первоначальные ошибки fixture (8.3/full
+path и lifetime TemporaryDirectory) не сохранялись ради ложного PASS.
+CI workflow отсутствует; обязательные проверки выполнены локально. Повтор
+неизменённых runtime-тестов после обновления итоговой документации не требовался.
 
-Малый SYSTEM-контроль подтвердил отказ пользователя открывать default mutex
-SYSTEM; общий DACL SYSTEM/Admin/оператор проверен в обоих направлениях.
-Историческая причинная связь с единичным AccessDenied остаётся неизвестной.
-Временные SYSTEM task/fixture этого контроля удалены.
+| Принятый объём | Реализация и доказательство |
+| --- | --- |
+| #1: многострочный cmd | ShellCommand отклоняет его до исполнения; integration29. |
+| #2: контракт exit | Явный shell exit и прямой exec проверены; stale LASTEXITCODE не используется для угадывания результата произвольного скрипта. |
+| #3: лёгкая отмена | Опрос500мс без полного Prepare/Inspect; WinJob21 и адресная отмена финальной AGY-сессии с cleanup=true/active0. |
+| #4: mutex DACL | Default SYSTEM mutex действительно отказал пользователю; helper SYSTEM/Admin/оператор прошёл оба направления. Историческая причина AccessDenied неизвестна. |
+| #5: восстановление | Известные собственные остатки восстанавливаются до проверки квот; Store53/telemetry23, без запуска без учёта и без ослабления приватности. |
+| #6: читаемость/approvals | Читаемая форма в native gate/README; реальные raw denial; native AGY Yes once без broad conversation/persistent allowlist. |
+| #7: вывод | Ограниченные начало/хвост и явный marker в общем64КиБ; WinJob21. |
+| #8: incident/HandleCount | До/после incident-сегменты, восемь counter groups; telemetry23 и native закрытый BLG. |
+| #9: принятые подпункты | Системный GetPerformanceInfo при прежнем резерве8+4ГиБ; явный heavy вместо regex; причины125/Home-path; isolated data_root; реальные hook error/deadline ниже. |
 
-Нативный Codex gate принят: прямая безвредная команда отклонена v3-hook,
-читаемая managed-команда в C:/Windows/System32 вернула CODEX_V3_MANAGED_OK.
-RunId 9698f69f4bfd4f7dbd6bcf321d3f4c24: exit0, cleanup=true, active0.
-Прежнее доверие v1 заменено пользователем на точную v3-дефиницию.
+## Нативная приёмка клиентов
 
-Для #9.3 пользователь отдельно доверил временный diagnostic hook. Исходный
-gate оставался первым и неизменным. Codex error-case принят: diagnostic
-0bca75e1bd5148f1b081fe4c8232ffe0 завершился exit7; actual tool
-51aa0fb8fbf646f69788e5a6183a3a62 затем выполнился exit0; cleanup=true/active0.
-Codex timeout-case принят независимым ревью по ограниченному наблюдению:
-native deadline 3 с, diagnostic Sleep5, внешний Job10; exact staged source,
-PowerShell14540 и Job active2 наблюдались для 6cc31cd3a3d6416e8343bcf5bee05068.
-Workload/controller/Job отсутствовали к 09:45:14.809 UTC, lifetime 2686 мс,
-раньше Sleep5/Job10; actual tool f26b74ff1bd94ec19befacf11e3bed5c выполнился
-exit0, cleanup=true/active0. Ошибок наблюдателя нет. Отдельное native timeout
-event/exception не наблюдалось; внутренний механизм отмены не утверждается.
-Вывод: при ошибке и прекращении callback по установленному сроку Codex
-продолжил команду; гарантированный fail-closed для сбоя клиента не доказан.
-Первый observer пропустил script из-за неучтённого штатного trailer; причина
-исправлена точным сравнением bytes, отрицательная fixture сохранена.
+Codex: raw команда отклонена точным v3 gate; managed marker CODEX_V3_MANAGED_OK
+в System32, Run9698f69f4bfd4f7dbd6bcf321d3f4c24: exit0, cleanup=true, active0.
+В принятом codex-cli0.169.0-alpha.11.1 error diagnostic0bca75e1bd5148f1b081fe4c8232ffe0
+вернул7, затем actual51aa0fb8fbf646f69788e5a6183a3a62 выполнился0.
+При native deadline3s и Sleep5/Job10 exact workload6cc31cd3a3d6416e8343bcf5bee05068
+наблюдался живым и исчез через2686мс вместе с controller/Job; затем actual
+f26b74ff1bd94ec19befacf11e3bed5c выполнился0. Native timeout exception не наблюдался;
+это black-box результат. Codex при этих отказах ПРОДОЛЖИЛ команду, fail-closed
+не гарантируется. Три прерванные diagnostic записи восстановлены существующим
+RunStore.Complete после exact Job/controller absence: exit=null,
+interrupted_reconciled/owner_gone_job_absent, cleanup=true/active0.
 
-Три оборванных diagnostic RunId (8649f972a78f4c16b7d19bb88f50975a,
-338a5cbf55d8483e8cd47fb8c9077658, 6cc31cd3a3d6416e8343bcf5bee05068)
-сверены по claim/source, отсутствующему exact Job и идентичностям процессов.
-Существующий RunStore.Complete записал interrupted_reconciled,
-owner_gone_job_absent, exit=null, cleanup=true/active0 и убрал claim/script.
-Неизвестный исходный exit не заменён успехом. Временный Codex hook возвращён
-к исходным байтам EC873E2A91428DCB74EF21C6E4676CECDC8F2D08D1F03C6003A1EAE50DB8A5C3.
+AGY1.1.27, binary SHA256
+D3BAE6895069231C169F427C99527D1F556951E9C43488F45E8B040FBF3011ED:
 
-Полная AGY-приёмка v3 остаётся NOT VERIFIED; raw gate принят выше. Исторические headless/TTY/winpty попытки
-остановлены с подтверждённой очисткой; WinPTY завершился assertion cols/rows
-до AGY. После Reload запас Commit позволил продолжить без снижения резерва.
-Настоящий ConPTY получен через уже установленный VS Code node-pty и его
-Electron Node: smoke IsInputRedirected=False/IsOutputRedirected=False,
-ReadLine roundtrip PASS, оба участника принадлежали exact общему Job.
-Это временная тестовая оснастка, runtime/common executor не менялись.
+| Контроль | Первичный результат |
+| --- | --- |
+| Raw | Native expanded tool card: точный v3 managed-route denial; raw не исполнен. |
+| Managed | AGY_V3_MANAGED_OK и фактический CWD=C:/Windows/System32; Runb8d488d4d81e48e1a19dd9a8d7a974b4, exit0/exited,274.9мс, cleanup=true/active0. |
+| Error | Native tool denied, ENTERED agy error; diagnostic871550e0e13d4b8eb7a0ee59b35174aa, exit7/exited,316.6мс, cleanup=true/active0. Actual error command не исполнена. |
+| Deadline | Native tool denied, ENTERED agy timeout; diagnostic33334ee1c17a40c393d49212ebc9a83a, exit125/parent_exit,2915.2мс при native3s/Sleep5/Job10, cleanup=true/active0. Actual timeout command не исполнена. |
 
-AGY1.1.27 в таком терминале запросил вход; RunId85134168c0ef44fe9123c882e89fcef7
-завершился timeout124, cleanup=true/active0. Наличие keyring target
-подтверждено только по metadata, credentials не читались.
-Для диагностики проверена временная официальная копия Windows x64 release1.1.28:
-ZIP SHA256 4EB8784538BC25EE597006AACDBC8E83819E4C1799330B678D0A1D73D7C6745D,
-проверен по GitHub asset digest; antigravity.exe SHA256
-E6EBE1D3B63AFD6B39B236D2F2667FB14355B1BD3BC17B44126A188D12E42F61.
-Release содержит исправление identity lookup при входе, но и временная копия
-запросила Google OAuth. Причина auth-сбоя не установлена. Установленный
-AGY1.1.27, PATH и hash профиля config.json не изменились.
-Пользователь поручил агенту выполнить AGY-тесты самому; необходимое личное
-участие ограничено входом Google. Ответ на запрос входа не получен за срок
-этого запуска; буфер обмена не читался, код не передавался и не сохранялся.
-Bridge завершил ожидание событием lifetime_limit в пределах общего Job900s.
-Owner RunId447b47b913ca46f3a34fedeff43d6902: shell exit0, reason=exited,
-cleanup=true/active0; shell exit не доказывает успешную авторизацию.
-Exact Job и прежние PID отсутствуют, active/pending=0 после завершения работ.
-Для следующего входа нужна свежая нативная OAuth-ссылка, а не код от закрытого окна.
+AGY при этих отказах ОТКЛОНИЛ команды. Parent_exit не называется внутренним
+native timeout exception. ENTERED, process id, exact source, receipt duration
+и завершение Job дают достаточное поведенческое доказательство; observer/повтор
+не потребовались. Независимое ревью всех четырёх AGY cases PASS по primary
+expanded tool cards и центральным receipts, без доверия пересказу модели.
 
-Оба временных hook возвращены к исходным байтам (Codex EC873E2A…5C3,
-AGY AF03ABA6…D12), исходные rollback-копии сохранены. Нативный rollback.ps1
--WhatIf PASS после восстановления и нового пользовательского trust.
-Тестовая папка ConPTY и официальный ZIP/exe удалены после проверки точных
-путей, отсутствия reparse, владельцев и подтверждённых архивных копий шести
-малых source/identity файлов; освобождено242945510B. Нового терминального
-контроллера, зависимости или службы в установленном runtime нет.
-Сохранены два приватных архива через действующего владельца telemetry:
-Codex evidence history/ae-20261114T095027060Z-5e9603a1.zip (8016B)
-и ConPTY source history/ae-20261114T095746154Z-09528ceb.zip (11269B).
-Оба ordinary на7суток внутри прежнего общего бюджета512МиБ. Проверенные
-исходные дубликаты двух Codex fixtures и четыре дополнительных backup-копии
-удалены; оригиналы и квалифицированная candidate-v3 сохранены.
+Последние три проверки выполнены в одной авторизованной ordinary сессии
+128713a554f5417c9953c41886501979 без выхода/перезапуска между ними. Source policy
+enableTerminalSandbox=false сохранена; наш лишний --sandbox из ранней попытки
+убран, UAC setup не выполнялся. После приёмки всех результатов сессия адресно
+завершена: exit130/cancelled, cleanup=true/active0, exact Job отсутствует.
+Одноразовые коды через clipboard передавались прямо клиенту; в команды,
+AGY prompt или evidence-файлы не включались. Причина того, что ранний CLI
+не восстановил вход после restart, неизвестна; это не исправление auth клиента.
+ConPTY использовал уже имеющиеся VS Code компоненты только как временную
+оснастку; в установленный runtime новый модуль/служба/зависимость не добавлены.
 
-SYSTEM maintenance принята: 14 ноября09:07:07 МСК result0. Существующая
-SYSTEM incident-задача принята функционально в09:22:22 МСК, result0,
-итог Ready, collector Running, gaps пусты; без synthetic Event1003/OOM.
-Свежий закрытый BLG incidents/ae-20261114T060036230Z-6a105801.blg:
-SHA256686612916BD22A40080A72AF2059E0D1E80DFD4ED99A4926EC121F412D7B40D2,
-3145728B; два native снимка06:22:07.178/06:22:22.182UTC, восемь групп с
-валидными значениями, 1591 status0/261 иной status2147485649, одна API ошибка
-сохранена; Handle Count527 валидных. Следующий сегмент retention_class=incident.
-Исторический history/ae-20261113T205904386Z-a9480341.blg не читается native
-(0xC0000BF7), сохранён; его целостность и причина остаются неподтверждёнными.
+## Диагностика, инварианты и уборка
 
-21 проверенный дубликат .goal2-prior (246445B) удалён после сверки с сохранёнными
-before-копиями; rollback-WhatIf тогда PASS. Полные rollback-assets, исторические
-бинарники и qualified candidate-v3 намеренно сохранены. После нативного trust
-диагностики подтверждён только соответствующий семантический TOML delta;
-агент доверие не записывал, installed hash rollback-entry обновлён.
-Metadata/provenance синхронизированы с текущим состоянием; artifact manifest
-содержит50 проверенных записей, source snapshot24 точных файла. Исходная
-квалификация сборки закреплена за e3146, её hash не подменён новым снимком.
-Независимая сверка предыдущего этапа PASS: 49 entries, 24 source files,
-21 provenance reference, оба hooks, native config, rollback и active/pending=0.
-Полный GOAL остаётся INCOMPLETE из-за незавершённой AGY-приёмки.
-Открыта оставшаяся AGY-приёмка: свежий личный вход, затем три actual run_command
-(managed success/CWD, error, timeout) и финализация затронутого участка.
-CI workflow отсутствует; обязательные локальные проверки пройдены.
-Remote/production и Hermes runtime не менялись. Первопричина прежнего OOM открыта.
+SYSTEM maintenance и ручная функциональная incident-задача приняты result0,
+TTL2минуты, без synthetic Event1003/OOM. Свежий закрытый
+incidents/ae-20261114T060036230Z-6a105801.blg проверен native: восемь групп имеют
+валидные значения, включая HandleCount;1591status0/261инойstatus2147485649,
+одна CounterApiError явно сохранена. Следующий сегмент incident.
+Исторический history/ae-20261113T205904386Z-a9480341.blg с0xC0000BF7 сохранён;
+его целостность/причина неизвестны. Последняя live сверка: collector Running,
+8counter paths, HandleCount настроен, gaps пусты; обнаружено92938103B при
+hard limit536870912B и reserved upper192993189B.
+
+Числовая policy, operator SID, data_root, native approvals и retention сохранены:
+2ГиБ/дерево,32processes,4slots/1heavy, максимум1800s, output64КиБ,
+ordinary7/incident30суток, общий512МиБ. Policy SHA256
+FCCAAF552B36F3B25406F64860F002A0DD06B901BEF81C3F7A139108417E5ACB.
+Оба temporary hooks возвращены к исходным EC873E2A…A5C3 / AF03ABA6…4D12;
+AGY config46D84942…4D981 не изменился. Native Codex trust53C12A13…B0ED7 отражает
+подтверждения пользователя; агент trust не записывал. rollback.ps1 -WhatIf PASS.
+
+Доказательства импортированы существующим telemetry owner с private ACL и
+ordinary7суток внутри общего бюджета. Final AGY evidence:
+history/ae-20261114T111829648Z-5978e826.zip (18597B,4source/16642B).
+Probe source packet: history/ae-20261114T112425253Z-59e4b3e7.zip
+(22823B,7source/20059B). Предыдущие Codex/Raw/ConPTY evidence архивы также
+сохраняются по policy; сырые данные в публичный Git не включены.
+
+Побайтовые копии проверены перед удалением:21старый .goal2-prior дубликат,
+позднейшие собственные backup-дубликаты и11финальных source-дубликатов36701B.
+Крупная временная официальная копия AGY1.1.28 и старые PTY fixtures тоже убраны.
+Native probe/PTY staging отсутствует, active/pending=0. Исходные rollback-assets
+и квалифицированные операторские артефакты сохранены. Remote/production и Hermes
+runtime не менялись. Source main, installed snapshot и artifact manifest
+сверены; принятый объём этого GOAL завершён, первопричина OOM остаётся открытой.
+Финальное независимое contract-outcome review принятого Goal1–9 — PASS:
+52 artifact entries, 24 source files, 21 provenance reference, оба клиента,
+архивы/ACL, сохранённые инварианты, rollback и адресная уборка приняты.
+
+## Исторический критический разбор (13 ноября)
 
 Согласие с дефектом не означает принятие предложенной реализации.
 Сохраняются лимиты ресурсов, учёт результата, общий бюджет хранения,
