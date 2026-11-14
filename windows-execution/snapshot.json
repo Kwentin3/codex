@@ -1,7 +1,7 @@
 {
     "schema_version":  2,
-    "checked_utc":  "2026-11-14T09:52:17.1854281Z",
-    "stage":  "Installed; Codex native gate/error/timeout and SYSTEM accepted; AGY auth and final delivery pending",
+    "checked_utc":  "2026-11-14T10:01:41.8606386Z",
+    "stage":  "Installed; Codex native gate/error/timeout and SYSTEM accepted; both diagnostic hooks restored; AGY fresh auth and actual acceptance pending",
     "platform":  "Windows Server 2019 x64 / PowerShell 5.1 / .NET Framework C#5",
     "historical_baseline":  {
                                 "commit":  "689ca8157afb63e1f680aa179084e5ac29dec521",
@@ -195,7 +195,7 @@
                        "ci":  "No repository workflow configured; required local checks completed",
                        "installed_v3":  "PASS exact published candidate bytes; no rebuild",
                        "native_Codex_v3":  "PASS native raw denial and managed marker; receipt cleanup=true/active0",
-                       "native_AGY_TUI_v3":  "True ConPTY/Job membership PASS; login required on1.1.27 and temporaryofficial1.1.28; native tool acceptance pending",
+                       "native_AGY_TUI_v3":  "True ConPTY and exact Job membership PASS; auth required on1.1.27 and temporary1.1.28; native tool acceptance NOT VERIFIED; all test processes stopped and temporary package removed",
                        "first_failures":  [
                                               "Integration fixture short/full Windows path mismatch fixed by canonical path resolution",
                                               "TemporaryDirectory variable overwritten by policy fixture; test lifetime fixed",
@@ -221,7 +221,7 @@
                                                 "gap_count":  0
                                             },
                        "client_hook_error_timeout":  "Codex PASS by native receipt and bounded process observation; AGY pending",
-                       "rollback_preflight":  "Repeat after exact AGY hook restoration; current AGY temporary diagnostic intentionally differs",
+                       "rollback_preflight":  "PASS after both exact hooks restored and user-native trust delta reconciled",
                        "installation_cleanup":  {
                                                     "status":  "PASS current installation cleanup",
                                                     "run_id":  "b0429da24a914d4890726a5ca34ad68e",
@@ -238,7 +238,7 @@
                                                                                ]
                                                 },
                        "client_hook_error_timeout_preparation":  {
-                                                                     "status":  "Codex restored; AGY temporary diagnostic active; personal OAuth pending",
+                                                                     "status":  "Both diagnostic hooks restored; Codex accepted, AGY actual tests pending",
                                                                      "directory":  ".local/client-hook-checks",
                                                                      "native_timeout_seconds":  3,
                                                                      "job_deadline_seconds":  10,
@@ -250,7 +250,7 @@
                                                                      "native_review_trust":  "belongs to client and user; not written by agent"
                                                                  },
                        "native_probe_activation":  {
-                                                       "stage":  "codex-restored-agy-diagnostics-active",
+                                                       "stage":  "both-restored-agy-auth-window-expired",
                                                        "transaction":  "rollback/client-hook-checks/transaction.json",
                                                        "original_hook_backups_verified":  2,
                                                        "backup_files_private":  4,
@@ -312,8 +312,54 @@
                                                           "evidence_source_bytes":  6784,
                                                           "evidence_archive_bytes":  8016,
                                                           "codex_hooks_restored_sha256":  "EC873E2A91428DCB74EF21C6E4676CECDC8F2D08D1F03C6003A1EAE50DB8A5C3",
-                                                          "fail_closed_guaranteed":  false
-                                                      }
+                                                          "fail_closed_guaranteed":  false,
+                                                          "evidence_source_duplicates_removed":  true
+                                                      },
+                       "native_acceptance_cleanup":  {
+                                                         "status":  "PASS current stage",
+                                                         "codex_original_sha256":  "EC873E2A91428DCB74EF21C6E4676CECDC8F2D08D1F03C6003A1EAE50DB8A5C3",
+                                                         "agy_original_sha256":  "AF03ABA68F71D8754CA44DCB10DE739BCA5D4D078D7365B9FD5131CAA4C64D12",
+                                                         "native_config_sha256":  "53C12A130E6B1FC3C4082B14CC3E81D067FD8B723A321F0AAE549D9DC15B0ED7",
+                                                         "rollback_whatif":  "PASS after exact restoration",
+                                                         "extra_verified_backup_duplicates_removed":  4,
+                                                         "codex_verified_archived_source_duplicates_removed":  2,
+                                                         "temporary_pty_directory_removed":  true,
+                                                         "temporary_package_and_source_bytes_removed":  242945510,
+                                                         "pty_source_archive":  "D:/AgentExecutionDiagnostics/history/ae-20261114T095746154Z-09528ceb.zip",
+                                                         "pty_archive_bytes":  11269,
+                                                         "pty_source_files":  6,
+                                                         "retention_class":  "ordinary",
+                                                         "ordinary_days":  7,
+                                                         "original_rollback_assets_preserved":  true,
+                                                         "qualified_candidate_v3_and_upgrade_recipe_retained":  true,
+                                                         "original_OOM_culprit":  "UNKNOWN"
+                                                     },
+                       "last_AGY_auth_attempt":  {
+                                                     "status":  "NOT VERIFIED; bounded personal OAuth wait expired",
+                                                     "authentication_completed":  false,
+                                                     "clipboard_read":  false,
+                                                     "authorization_code_forwarded":  false,
+                                                     "run_id":  "447b47b913ca46f3a34fedeff43d6902",
+                                                     "owner":  "background:heavy:goal2-agy-1128-pty",
+                                                     "job_deadline_seconds":  900,
+                                                     "bridge_event":  "lifetime_limit",
+                                                     "owner_shell_exit_code":  0,
+                                                     "owner_reason":  "exited",
+                                                     "cleanup_confirmed":  true,
+                                                     "active_processes_at_end":  0,
+                                                     "former_node_child_controller_pids_absent":  true,
+                                                     "installed_cli":  "1.1.27",
+                                                     "installed_binary_sha256":  "D3BAE6895069231C169F427C99527D1F556951E9C43488F45E8B040FBF3011ED",
+                                                     "temporary_cli":  "1.1.28",
+                                                     "temporary_binary_sha256":  "E6EBE1D3B63AFD6B39B236D2F2667FB14355B1BD3BC17B44126A188D12E42F61",
+                                                     "temporary_package_sha256":  "4EB8784538BC25EE597006AACDBC8E83819E4C1799330B678D0A1D73D7C6745D",
+                                                     "temporary_binary_removed":  true,
+                                                     "installed_cli_or_PATH_replaced":  false,
+                                                     "profile_config_unchanged":  true,
+                                                     "profile_config_sha256":  "46D8494205D82C6076B9215D8EA7EDA5310DB15D10C61E0923F56DD71CD4D981",
+                                                     "auth_failure_cause":  "UNKNOWN; release identity-lookup fix alone did not resolve current startup",
+                                                     "next":  "Fresh native OAuth URL required; closed-window code must not be consumed"
+                                                 }
                    },
     "limits":  {
                    "memory_mb_per_tree":  2048,
@@ -327,15 +373,15 @@
                    "aggregate_bytes":  536870912
                },
     "delivery":  {
-                     "goal_status":  "active-awaiting-AGY-native-auth",
-                     "reason":  "User reloaded VS Code; Codex native gate/error/timeout accepted; AGY requires personal Google login, agent will run tests",
+                     "goal_status":  "active-awaiting-fresh-AGY-native-auth",
+                     "reason":  "Codex native gate/error/timeout accepted; bounded AGY auth wait expired without user input; both temporary hooks restored and task resources cleaned",
                      "temporary_codex_hook_installed":  false,
-                     "temporary_agy_hook_installed":  true,
+                     "temporary_agy_hook_installed":  false,
                      "scope_unchanged":  true,
                      "remaining":  [
-                                       "AGY native raw/managed/error/timeout cases",
-                                       "Restore exact AGY hook bytes and stop all owned participants",
-                                       "Final metadata/rollback/cleanup/publication checks"
+                                       "Fresh personal Google OAuth in a new bounded AGY run",
+                                       "Four actual AGY native raw/managed/error/timeout cases",
+                                       "Finalize affected hooks/evidence/metadata and exact cleanup after AGY acceptance"
                                    ]
                  }
 }
